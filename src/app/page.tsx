@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
+import Link from "next/link";
 
 export default function Home() {
   return (
@@ -19,7 +20,9 @@ export default function Home() {
               />
             </div>
           </div>
-          <Button>+ Add Client</Button>
+          <Link href="/clients">
+            <Button>+ Add Client</Button>
+          </Link>
         </div>
       </header>
 
@@ -34,50 +37,56 @@ export default function Home() {
           </div>
 
           <div className="grid gap-6 md:grid-cols-3">
-            <Card className="cursor-pointer hover:shadow-md transition-shadow">
-              <CardHeader>
-                <CardTitle>Clients</CardTitle>
-                <CardDescription>Manage your client database</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Add and organize all your clients in one place.
-                </p>
-                <Button variant="outline" className="w-full">
-                  View Clients
-                </Button>
-              </CardContent>
-            </Card>
+            <Link href="/clients">
+              <Card className="cursor-pointer hover:shadow-md transition-shadow h-full">
+                <CardHeader>
+                  <CardTitle>Clients</CardTitle>
+                  <CardDescription>Manage your client database</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Add and organize all your clients in one place.
+                  </p>
+                  <Button variant="outline" className="w-full">
+                    View Clients
+                  </Button>
+                </CardContent>
+              </Card>
+            </Link>
 
-            <Card className="cursor-pointer hover:shadow-md transition-shadow">
-              <CardHeader>
-                <CardTitle>Pets</CardTitle>
-                <CardDescription>Track pet information</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Keep detailed records for each pet in your care.
-                </p>
-                <Button variant="outline" className="w-full">
-                  View Pets
-                </Button>
-              </CardContent>
-            </Card>
+            <Link href="/pets">
+              <Card className="cursor-pointer hover:shadow-md transition-shadow h-full">
+                <CardHeader>
+                  <CardTitle>Pets</CardTitle>
+                  <CardDescription>Track pet information</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Keep detailed records for each pet in your care.
+                  </p>
+                  <Button variant="outline" className="w-full">
+                    View Pets
+                  </Button>
+                </CardContent>
+              </Card>
+            </Link>
 
-            <Card className="cursor-pointer hover:shadow-md transition-shadow">
-              <CardHeader>
-                <CardTitle>Schedule</CardTitle>
-                <CardDescription>Book and manage appointments</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground mb-4">
-                  View your schedule and book appointments quickly.
-                </p>
-                <Button variant="outline" className="w-full">
-                  View Schedule
-                </Button>
-              </CardContent>
-            </Card>
+            <Link href="/schedule">
+              <Card className="cursor-pointer hover:shadow-md transition-shadow h-full">
+                <CardHeader>
+                  <CardTitle>Schedule</CardTitle>
+                  <CardDescription>Book and manage appointments</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    View your schedule and book appointments quickly.
+                  </p>
+                  <Button variant="outline" className="w-full">
+                    View Schedule
+                  </Button>
+                </CardContent>
+              </Card>
+            </Link>
           </div>
         </div>
       </div>
