@@ -36,3 +36,34 @@ export async function getClients() {
   });
 }
 
+export async function updateClient(id: string, formData: FormData) {
+  const firstName = formData.get("firstName") as string;
+  const lastName = formData.get("lastName") as string;
+  const email = formData.get("email") as string | null;
+  const phone = formData.get("phone") as string | null;
+
+  if (!firstName || !lastName) {
+    throw new Error("First name and last name are required");
+  }
+
+  await prisma.client.update({
+    where: { id },
+    data: {
+      firstName,
+      lastName,
+      email: email || null,
+      phone: phone || null,
+    },
+  });
+
+  revalidatePath("/clients");
+}
+
+export async function deleteClient(id: string) {
+  await prisma.client.delete({
+    where: { id },
+  });
+
+  revalidatePath("/clients");
+}
+
