@@ -31,6 +31,7 @@ export async function createAppointment(formData: FormData) {
   });
 
   revalidatePath("/schedule");
+  revalidatePath("/");
 }
 
 export async function getAppointments() {
@@ -90,6 +91,7 @@ export async function updateAppointment(id: string, formData: FormData) {
   });
 
   revalidatePath("/schedule");
+  revalidatePath("/");
 }
 
 export async function updateAppointmentStatus(id: string, status: string) {
@@ -99,6 +101,7 @@ export async function updateAppointmentStatus(id: string, status: string) {
   });
 
   revalidatePath("/schedule");
+  revalidatePath("/");
 }
 
 export async function deleteAppointment(id: string) {
@@ -107,5 +110,6 @@ export async function deleteAppointment(id: string) {
   });
 
   revalidatePath("/schedule");
+  revalidatePath("/");
 }
 
