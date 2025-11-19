@@ -49,6 +49,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 
 type Pet = {
   id: string;
@@ -263,19 +264,37 @@ function StatusMenuItem({
 
 function AddAppointmentDialog({ pets }: { pets: Pet[] }) {
   const [open, setOpen] = useState(false);
+  const [selectedPetId, setSelectedPetId] = useState("");
+
+  const petOptions = pets.map((pet) => ({
+    value: pet.id,
+    label: pet.name,
+    sublabel: `${pet.client.firstName} ${pet.client.lastName}`,
+  }));
 
   async function handleSubmit(formData: FormData) {
+    if (!selectedPetId) {
+      toast.error("Please select a pet");
+      return;
+    }
+
+    formData.set("petId", selectedPetId);
+
     try {
       await createAppointment(formData);
       setOpen(false);
+      setSelectedPetId("");
       toast.success("Appointment booked successfully");
-    } catch (error) {
+    } catch {
       toast.error("Failed to book appointment");
     }
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(isOpen) => {
+      setOpen(isOpen);
+      if (!isOpen) setSelectedPetId("");
+    }}>
       <DialogTrigger asChild>
         <Button>
           <Plus className="h-4 w-4 mr-2" />
@@ -291,20 +310,15 @@ function AddAppointmentDialog({ pets }: { pets: Pet[] }) {
         </DialogHeader>
         <form action={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="petId">Pet *</Label>
-            <select
-              id="petId"
-              name="petId"
-              required
-              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <option value="">Select a pet</option>
-              {pets.map((pet) => (
-                <option key={pet.id} value={pet.id}>
-                  {pet.name} ({pet.client.firstName} {pet.client.lastName})
-                </option>
-              ))}
-            </select>
+            <Label>Pet *</Label>
+            <SearchableSelect
+              options={petOptions}
+              value={selectedPetId}
+              onValueChange={setSelectedPetId}
+              placeholder="Search for a pet..."
+              searchPlaceholder="Type pet name or owner..."
+              emptyMessage="No pets found."
+            />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
@@ -373,13 +387,27 @@ function EditAppointmentDialog({
   pets: Pet[];
 }) {
   const [open, setOpen] = useState(false);
+  const [selectedPetId, setSelectedPetId] = useState(appointment.petId);
+
+  const petOptions = pets.map((pet) => ({
+    value: pet.id,
+    label: pet.name,
+    sublabel: `${pet.client.firstName} ${pet.client.lastName}`,
+  }));
 
   async function handleSubmit(formData: FormData) {
+    if (!selectedPetId) {
+      toast.error("Please select a pet");
+      return;
+    }
+
+    formData.set("petId", selectedPetId);
+
     try {
       await updateAppointment(appointment.id, formData);
       setOpen(false);
       toast.success("Appointment updated successfully");
-    } catch (error) {
+    } catch {
       toast.error("Failed to update appointment");
     }
   }
@@ -387,7 +415,10 @@ function EditAppointmentDialog({
   const appointmentDate = new Date(appointment.date);
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(isOpen) => {
+      setOpen(isOpen);
+      if (!isOpen) setSelectedPetId(appointment.petId);
+    }}>
       <DialogTrigger asChild>
         <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
           <Pencil className="h-4 w-4 mr-2" />
@@ -403,21 +434,15 @@ function EditAppointmentDialog({
         </DialogHeader>
         <form action={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="edit-petId">Pet *</Label>
-            <select
-              id="edit-petId"
-              name="petId"
-              required
-              defaultValue={appointment.petId}
-              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <option value="">Select a pet</option>
-              {pets.map((pet) => (
-                <option key={pet.id} value={pet.id}>
-                  {pet.name} ({pet.client.firstName} {pet.client.lastName})
-                </option>
-              ))}
-            </select>
+            <Label>Pet *</Label>
+            <SearchableSelect
+              options={petOptions}
+              value={selectedPetId}
+              onValueChange={setSelectedPetId}
+              placeholder="Search for a pet..."
+              searchPlaceholder="Type pet name or owner..."
+              emptyMessage="No pets found."
+            />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">

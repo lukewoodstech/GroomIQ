@@ -32,6 +32,7 @@ import {
 import { createPet, updatePet, deletePet } from "../actions/pets";
 import { Plus, MoreVertical, Pencil, Trash2, Search, PawPrint } from "lucide-react";
 import { toast } from "sonner";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 
 type Client = {
   id: string;
@@ -165,19 +166,36 @@ function PetCard({ pet, clients }: { pet: Pet; clients: Client[] }) {
 
 function AddPetDialog({ clients }: { clients: Client[] }) {
   const [open, setOpen] = useState(false);
+  const [selectedClientId, setSelectedClientId] = useState("");
+
+  const clientOptions = clients.map((client) => ({
+    value: client.id,
+    label: `${client.firstName} ${client.lastName}`,
+  }));
 
   async function handleSubmit(formData: FormData) {
+    if (!selectedClientId) {
+      toast.error("Please select an owner");
+      return;
+    }
+
+    formData.set("clientId", selectedClientId);
+
     try {
       await createPet(formData);
       setOpen(false);
+      setSelectedClientId("");
       toast.success("Pet added successfully");
-    } catch (error) {
+    } catch {
       toast.error("Failed to add pet");
     }
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(isOpen) => {
+      setOpen(isOpen);
+      if (!isOpen) setSelectedClientId("");
+    }}>
       <DialogTrigger asChild>
         <Button>
           <Plus className="h-4 w-4 mr-2" />
@@ -193,20 +211,15 @@ function AddPetDialog({ clients }: { clients: Client[] }) {
         </DialogHeader>
         <form action={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="clientId">Owner *</Label>
-            <select
-              id="clientId"
-              name="clientId"
-              required
-              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <option value="">Select a client</option>
-              {clients.map((client) => (
-                <option key={client.id} value={client.id}>
-                  {client.firstName} {client.lastName}
-                </option>
-              ))}
-            </select>
+            <Label>Owner *</Label>
+            <SearchableSelect
+              options={clientOptions}
+              value={selectedClientId}
+              onValueChange={setSelectedClientId}
+              placeholder="Search for an owner..."
+              searchPlaceholder="Type owner name..."
+              emptyMessage="No clients found."
+            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="name">Pet Name *</Label>
@@ -257,19 +270,35 @@ function AddPetDialog({ clients }: { clients: Client[] }) {
 
 function EditPetDialog({ pet, clients }: { pet: Pet; clients: Client[] }) {
   const [open, setOpen] = useState(false);
+  const [selectedClientId, setSelectedClientId] = useState(pet.clientId);
+
+  const clientOptions = clients.map((client) => ({
+    value: client.id,
+    label: `${client.firstName} ${client.lastName}`,
+  }));
 
   async function handleSubmit(formData: FormData) {
+    if (!selectedClientId) {
+      toast.error("Please select an owner");
+      return;
+    }
+
+    formData.set("clientId", selectedClientId);
+
     try {
       await updatePet(pet.id, formData);
       setOpen(false);
       toast.success("Pet updated successfully");
-    } catch (error) {
+    } catch {
       toast.error("Failed to update pet");
     }
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(isOpen) => {
+      setOpen(isOpen);
+      if (!isOpen) setSelectedClientId(pet.clientId);
+    }}>
       <DialogTrigger asChild>
         <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
           <Pencil className="h-4 w-4 mr-2" />
@@ -285,21 +314,15 @@ function EditPetDialog({ pet, clients }: { pet: Pet; clients: Client[] }) {
         </DialogHeader>
         <form action={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="edit-clientId">Owner *</Label>
-            <select
-              id="edit-clientId"
-              name="clientId"
-              required
-              defaultValue={pet.clientId}
-              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <option value="">Select a client</option>
-              {clients.map((client) => (
-                <option key={client.id} value={client.id}>
-                  {client.firstName} {client.lastName}
-                </option>
-              ))}
-            </select>
+            <Label>Owner *</Label>
+            <SearchableSelect
+              options={clientOptions}
+              value={selectedClientId}
+              onValueChange={setSelectedClientId}
+              placeholder="Search for an owner..."
+              searchPlaceholder="Type owner name..."
+              emptyMessage="No clients found."
+            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="edit-name">Pet Name *</Label>
