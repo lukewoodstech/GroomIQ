@@ -68,12 +68,19 @@ type Appointment = {
   pet: Pet;
 };
 
+type Service = {
+  id: string;
+  name: string;
+};
+
 export function SchedulePageContent({
   appointments,
   pets,
+  services,
 }: {
   appointments: Appointment[];
   pets: Pet[];
+  services: Service[];
 }) {
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -117,7 +124,7 @@ export function SchedulePageContent({
               />
             </div>
           </div>
-          <AddAppointmentDialog pets={pets} />
+          <AddAppointmentDialog pets={pets} services={services} />
         </div>
       </header>
 
@@ -140,7 +147,7 @@ export function SchedulePageContent({
                   ? "No appointments found matching your search."
                   : "No appointments yet. Book your first appointment to get started."}
               </p>
-              {!searchTerm && <AddAppointmentDialog pets={pets} />}
+              {!searchTerm && <AddAppointmentDialog pets={pets} services={services} />}
             </div>
           ) : (
             <div className="space-y-6">
@@ -155,7 +162,7 @@ export function SchedulePageContent({
                     </h2>
                     <div className="space-y-2">
                       {dateAppointments.map((apt) => (
-                        <AppointmentCard key={apt.id} appointment={apt} pets={pets} />
+                        <AppointmentCard key={apt.id} appointment={apt} pets={pets} services={services} />
                       ))}
                     </div>
                   </div>
@@ -172,9 +179,11 @@ export function SchedulePageContent({
 function AppointmentCard({
   appointment,
   pets,
+  services,
 }: {
   appointment: Appointment;
   pets: Pet[];
+  services: Service[];
 }) {
   return (
     <div className="rounded-lg border p-4 hover:shadow-md transition-shadow">
@@ -218,7 +227,7 @@ function AppointmentCard({
               <StatusMenuItem appointment={appointment} status="completed" />
               <StatusMenuItem appointment={appointment} status="cancelled" />
               <DropdownMenuSeparator />
-              <EditAppointmentDialog appointment={appointment} pets={pets} />
+              <EditAppointmentDialog appointment={appointment} pets={pets} services={services} />
               <DeleteAppointmentDialog appointment={appointment} />
             </DropdownMenuContent>
           </DropdownMenu>
@@ -262,7 +271,7 @@ function StatusMenuItem({
   );
 }
 
-function AddAppointmentDialog({ pets }: { pets: Pet[] }) {
+function AddAppointmentDialog({ pets, services }: { pets: Pet[]; services: Service[] }) {
   const [open, setOpen] = useState(false);
   const [selectedPetId, setSelectedPetId] = useState("");
 
@@ -350,11 +359,11 @@ function AddAppointmentDialog({ pets }: { pets: Pet[] }) {
                 className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <option value="">Select service</option>
-                <option value="Full Groom">Full Groom</option>
-                <option value="Bath">Bath</option>
-                <option value="Nail Trim">Nail Trim</option>
-                <option value="Haircut">Haircut</option>
-                <option value="Other">Other</option>
+                {services.map((service) => (
+                  <option key={service.id} value={service.name}>
+                    {service.name}
+                  </option>
+                ))}
               </select>
             </div>
           </div>
@@ -382,9 +391,11 @@ function AddAppointmentDialog({ pets }: { pets: Pet[] }) {
 function EditAppointmentDialog({
   appointment,
   pets,
+  services,
 }: {
   appointment: Appointment;
   pets: Pet[];
+  services: Service[];
 }) {
   const [open, setOpen] = useState(false);
   const [selectedPetId, setSelectedPetId] = useState(appointment.petId);
@@ -487,11 +498,11 @@ function EditAppointmentDialog({
                 className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <option value="">Select service</option>
-                <option value="Full Groom">Full Groom</option>
-                <option value="Bath">Bath</option>
-                <option value="Nail Trim">Nail Trim</option>
-                <option value="Haircut">Haircut</option>
-                <option value="Other">Other</option>
+                {services.map((service) => (
+                  <option key={service.id} value={service.name}>
+                    {service.name}
+                  </option>
+                ))}
               </select>
             </div>
           </div>

@@ -78,12 +78,20 @@ const CALENDAR_START_HOUR = 7;
 const CALENDAR_END_HOUR = 21;
 const HOUR_HEIGHT = 80; // pixels per hour
 
+type Service = {
+  id: string;
+  name: string;
+  duration: number;
+};
+
 export function CalendarPageContent({
   appointments,
   pets,
+  services,
 }: {
   appointments: Appointment[];
   pets: Pet[];
+  services: Service[];
 }) {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [searchTerm, setSearchTerm] = useState("");
@@ -265,7 +273,7 @@ export function CalendarPageContent({
               <CalendarIcon className="h-4 w-4" />
               Week
             </Button>
-            <AddAppointmentDialog pets={pets} selectedDate={selectedDate} />
+            <AddAppointmentDialog pets={pets} services={services} selectedDate={selectedDate} />
           </div>
         </div>
       </div>
@@ -287,6 +295,7 @@ export function CalendarPageContent({
             date={selectedDate}
             appointments={getAppointmentsForDate(selectedDate)}
             pets={pets}
+            services={services}
             timeSlots={timeSlots}
             currentTime={currentTime}
             onTimeSlotClick={handleTimeSlotClick}
@@ -316,6 +325,7 @@ export function CalendarPageContent({
       {/* Quick Add Dialog */}
       {quickAddTime && (
         <QuickAddDialog
+          services={services}
           pets={pets}
           date={quickAddTime.date}
           hour={quickAddTime.hour}
@@ -330,6 +340,7 @@ function DayView({
   date,
   appointments,
   pets,
+  services,
   timeSlots,
   currentTime,
   onTimeSlotClick,
@@ -340,6 +351,7 @@ function DayView({
   date: Date;
   appointments: Appointment[];
   pets: Pet[];
+  services: Service[];
   timeSlots: number[];
   currentTime: Date;
   onTimeSlotClick: (date: Date, hour: number) => void;
@@ -408,6 +420,7 @@ function DayView({
             key={apt.id}
             appointment={apt}
             pets={pets}
+            services={services}
             onDragStart={onDragStart}
           />
         ))}
@@ -657,10 +670,12 @@ function WeekView({
 function AppointmentBlock({
   appointment,
   pets,
+  services,
   onDragStart,
 }: {
   appointment: Appointment;
   pets: Pet[];
+  services: Service[];
   onDragStart: (apt: Appointment) => void;
 }) {
   const aptDate = new Date(appointment.date);
@@ -748,7 +763,7 @@ function AppointmentBlock({
               <StatusMenuItem appointment={appointment} status="completed" />
               <StatusMenuItem appointment={appointment} status="cancelled" />
               <DropdownMenuSeparator />
-              <EditAppointmentDialog appointment={appointment} pets={pets} />
+              <EditAppointmentDialog appointment={appointment} pets={pets} services={services} />
               <DeleteAppointmentDialog appointment={appointment} />
             </DropdownMenuContent>
           </DropdownMenu>
@@ -855,11 +870,13 @@ function StatusMenuItem({
 
 function QuickAddDialog({
   pets,
+  services,
   date,
   hour,
   onClose,
 }: {
   pets: Pet[];
+  services: Service[];
   date: Date;
   hour: number;
   onClose: () => void;
@@ -934,11 +951,11 @@ function QuickAddDialog({
                 className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               >
                 <option value="">Select service</option>
-                <option value="Full Groom">Full Groom</option>
-                <option value="Bath">Bath</option>
-                <option value="Nail Trim">Nail Trim</option>
-                <option value="Haircut">Haircut</option>
-                <option value="Other">Other</option>
+                {services.map((service) => (
+                  <option key={service.id} value={service.name}>
+                    {service.name}
+                  </option>
+                ))}
               </select>
             </div>
           </div>
@@ -965,9 +982,11 @@ function QuickAddDialog({
 
 function AddAppointmentDialog({
   pets,
+  services,
   selectedDate,
 }: {
   pets: Pet[];
+  services: Service[];
   selectedDate: Date;
 }) {
   const [open, setOpen] = useState(false);
@@ -1063,11 +1082,11 @@ function AddAppointmentDialog({
                 className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <option value="">Select service</option>
-                <option value="Full Groom">Full Groom</option>
-                <option value="Bath">Bath</option>
-                <option value="Nail Trim">Nail Trim</option>
-                <option value="Haircut">Haircut</option>
-                <option value="Other">Other</option>
+                {services.map((service) => (
+                  <option key={service.id} value={service.name}>
+                    {service.name}
+                  </option>
+                ))}
               </select>
             </div>
           </div>
@@ -1099,9 +1118,11 @@ function AddAppointmentDialog({
 function EditAppointmentDialog({
   appointment,
   pets,
+  services,
 }: {
   appointment: Appointment;
   pets: Pet[];
+  services: Service[];
 }) {
   const [open, setOpen] = useState(false);
   const [selectedPetId, setSelectedPetId] = useState(appointment.petId);
@@ -1204,11 +1225,11 @@ function EditAppointmentDialog({
                 className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <option value="">Select service</option>
-                <option value="Full Groom">Full Groom</option>
-                <option value="Bath">Bath</option>
-                <option value="Nail Trim">Nail Trim</option>
-                <option value="Haircut">Haircut</option>
-                <option value="Other">Other</option>
+                {services.map((service) => (
+                  <option key={service.id} value={service.name}>
+                    {service.name}
+                  </option>
+                ))}
               </select>
             </div>
           </div>
