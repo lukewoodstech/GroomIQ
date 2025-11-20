@@ -2,31 +2,76 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
+
+// Validation schema
+const petSchema = z.object({
+  name: z.string().min(1, "Pet name is required").max(100, "Name is too long"),
+  breed: z
+    .string()
+    .max(100, "Breed name is too long")
+    .optional()
+    .or(z.literal(""))
+    .transform((val) => (val === "" ? null : val)),
+  species: z.enum(["dog", "cat", "other"], { message: "Please select a species" }),
+  age: z
+    .number()
+    .int("Age must be a whole number")
+    .min(0, "Age cannot be negative")
+    .max(50, "Age seems unrealistic")
+    .nullable()
+    .optional(),
+  notes: z
+    .string()
+    .max(1000, "Notes are too long")
+    .optional()
+    .or(z.literal(""))
+    .transform((val) => (val === "" ? null : val)),
+  clientId: z.string().min(1, "Owner is required"),
+});
 
 export async function createPet(formData: FormData) {
-  const name = formData.get("name") as string;
-  const breed = formData.get("breed") as string | null;
-  const species = formData.get("species") as string;
-  const age = formData.get("age") ? parseInt(formData.get("age") as string) : null;
-  const notes = formData.get("notes") as string | null;
-  const clientId = formData.get("clientId") as string;
+  try {
+    const ageValue = formData.get("age");
+    const rawData = {
+      name: formData.get("name"),
+      breed: formData.get("breed") || "",
+      species: formData.get("species"),
+      age: ageValue && ageValue !== "" ? Number(ageValue) : null,
+      notes: formData.get("notes") || "",
+      clientId: formData.get("clientId"),
+    };
 
-  if (!name || !species || !clientId) {
-    throw new Error("Name, species, and client are required");
+    const validated = petSchema.parse(rawData);
+
+    // Verify client exists
+    const client = await prisma.client.findUnique({
+      where: { id: validated.clientId },
+    });
+
+    if (!client) {
+      throw new Error("Selected owner not found");
+    }
+
+    await prisma.pet.create({
+      data: {
+        name: validated.name,
+        breed: validated.breed,
+        species: validated.species,
+        age: validated.age,
+        notes: validated.notes,
+        clientId: validated.clientId,
+      },
+    });
+
+    revalidatePath("/pets", "layout");
+    return { success: true };
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      throw new Error(error.issues[0].message);
+    }
+    throw error;
   }
-
-  await prisma.pet.create({
-    data: {
-      name,
-      breed: breed || null,
-      species,
-      age,
-      notes: notes || null,
-      clientId,
-    },
-  });
-
-  revalidatePath("/pets");
 }
 
 export async function getPets() {
@@ -62,37 +107,75 @@ export async function getClients() {
 }
 
 export async function updatePet(id: string, formData: FormData) {
-  const name = formData.get("name") as string;
-  const breed = formData.get("breed") as string | null;
-  const species = formData.get("species") as string;
-  const age = formData.get("age") ? parseInt(formData.get("age") as string) : null;
-  const notes = formData.get("notes") as string | null;
-  const clientId = formData.get("clientId") as string;
+  try {
+    const ageValue = formData.get("age");
+    const rawData = {
+      name: formData.get("name"),
+      breed: formData.get("breed") || "",
+      species: formData.get("species"),
+      age: ageValue && ageValue !== "" ? Number(ageValue) : null,
+      notes: formData.get("notes") || "",
+      clientId: formData.get("clientId"),
+    };
 
-  if (!name || !species || !clientId) {
-    throw new Error("Name, species, and client are required");
+    const validated = petSchema.parse(rawData);
+
+    // Verify client exists
+    const client = await prisma.client.findUnique({
+      where: { id: validated.clientId },
+    });
+
+    if (!client) {
+      throw new Error("Selected owner not found");
+    }
+
+    await prisma.pet.update({
+      where: { id },
+      data: {
+        name: validated.name,
+        breed: validated.breed,
+        species: validated.species,
+        age: validated.age,
+        notes: validated.notes,
+        clientId: validated.clientId,
+      },
+    });
+
+    revalidatePath("/pets", "layout");
+    return { success: true };
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      throw new Error(error.issues[0].message);
+    }
+    throw error;
   }
-
-  await prisma.pet.update({
-    where: { id },
-    data: {
-      name,
-      breed: breed || null,
-      species,
-      age,
-      notes: notes || null,
-      clientId,
-    },
-  });
-
-  revalidatePath("/pets");
 }
 
 export async function deletePet(id: string) {
+  // Check appointment count before deletion
+  const pet = await prisma.pet.findUnique({
+    where: { id },
+    include: {
+      _count: {
+        select: { appointments: true },
+      },
+    },
+  });
+
+  if (!pet) {
+    throw new Error("Pet not found");
+  }
+
   await prisma.pet.delete({
     where: { id },
   });
 
-  revalidatePath("/pets");
+  revalidatePath("/pets", "layout");
+  return {
+    success: true,
+    message:
+      pet._count.appointments > 0
+        ? `Deleted pet and ${pet._count.appointments} associated appointment(s)`
+        : undefined,
+  };
 }
-
