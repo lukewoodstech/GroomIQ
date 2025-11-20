@@ -30,10 +30,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { createPet, updatePet, deletePet } from "../actions/pets";
-import { Plus, MoreVertical, Pencil, Trash2, Search, PawPrint } from "lucide-react";
+import { Plus, MoreVertical, Pencil, Trash2, Search, PawPrint, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 type Client = {
   id: string;
@@ -56,11 +57,20 @@ type Pet = {
 export function PetsPageContent({
   pets,
   clients,
+  total,
+  page,
+  totalPages,
+  itemsPerPage,
 }: {
   pets: Pet[];
   clients: Client[];
+  total: number;
+  page: number;
+  totalPages: number;
+  itemsPerPage: number;
 }) {
   const [searchTerm, setSearchTerm] = useState("");
+  const router = useRouter();
 
   const filteredPets = pets.filter((pet) => {
     const searchLower = searchTerm.toLowerCase();
@@ -72,6 +82,10 @@ export function PetsPageContent({
       pet.client.lastName.toLowerCase().includes(searchLower)
     );
   });
+
+  const handlePageChange = (newPage: number) => {
+    router.push(`/pets?page=${newPage}`);
+  };
 
   return (
     <main className="flex flex-1 flex-col overflow-hidden">
@@ -116,11 +130,77 @@ export function PetsPageContent({
               {!searchTerm && <AddPetDialog clients={clients} />}
             </div>
           ) : (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {filteredPets.map((pet) => (
-                <PetCard key={pet.id} pet={pet} clients={clients} />
-              ))}
-            </div>
+            <>
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {filteredPets.map((pet) => (
+                  <PetCard key={pet.id} pet={pet} clients={clients} />
+                ))}
+              </div>
+
+              {/* Pagination - only show when not searching */}
+              {!searchTerm && totalPages > 1 && (
+                <div className="mt-8 flex items-center justify-between border-t pt-6">
+                  <p className="text-sm text-muted-foreground">
+                    Showing {(page - 1) * itemsPerPage + 1} to{" "}
+                    {Math.min(page * itemsPerPage, total)} of {total} pets
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handlePageChange(page - 1)}
+                      disabled={page === 1}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                      Previous
+                    </Button>
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: totalPages }, (_, i) => i + 1)
+                        .filter((p) => {
+                          // Show first page, last page, current page, and 1 page on each side of current
+                          return (
+                            p === 1 ||
+                            p === totalPages ||
+                            (p >= page - 1 && p <= page + 1)
+                          );
+                        })
+                        .map((p, idx, arr) => {
+                          // Add ellipsis when there's a gap
+                          const prevPage = arr[idx - 1];
+                          const showEllipsis = prevPage && p - prevPage > 1;
+
+                          return (
+                            <div key={p} className="flex items-center gap-1">
+                              {showEllipsis && (
+                                <span className="px-2 text-muted-foreground">
+                                  ...
+                                </span>
+                              )}
+                              <Button
+                                variant={p === page ? "default" : "outline"}
+                                size="sm"
+                                onClick={() => handlePageChange(p)}
+                                className="min-w-[40px]"
+                              >
+                                {p}
+                              </Button>
+                            </div>
+                          );
+                        })}
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handlePageChange(page + 1)}
+                      disabled={page === totalPages}
+                    >
+                      Next
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>

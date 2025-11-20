@@ -73,15 +73,30 @@ export async function createClient(formData: FormData) {
   }
 }
 
-export async function getClients() {
-  return await prisma.client.findMany({
-    orderBy: {
-      createdAt: "desc",
-    },
-    include: {
-      pets: true,
-    },
-  });
+export async function getClients(page: number = 1, itemsPerPage: number = 20) {
+  const skip = (page - 1) * itemsPerPage;
+
+  const [clients, total] = await Promise.all([
+    prisma.client.findMany({
+      skip,
+      take: itemsPerPage,
+      orderBy: {
+        createdAt: "desc",
+      },
+      include: {
+        pets: true,
+      },
+    }),
+    prisma.client.count(),
+  ]);
+
+  return {
+    clients,
+    total,
+    page,
+    itemsPerPage,
+    totalPages: Math.ceil(total / itemsPerPage),
+  };
 }
 
 export async function getClient(id: string) {

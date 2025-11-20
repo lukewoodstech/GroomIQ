@@ -30,9 +30,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { createClient, updateClient, deleteClient } from "../actions/clients";
-import { Plus, MoreVertical, Pencil, Trash2, Search, Phone, Mail } from "lucide-react";
+import { Plus, MoreVertical, Pencil, Trash2, Search, Phone, Mail, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 type Client = {
   id: string;
@@ -43,8 +44,21 @@ type Client = {
   pets: Array<{ id: string }>;
 };
 
-export function ClientsPageContent({ clients }: { clients: Client[] }) {
+export function ClientsPageContent({
+  clients,
+  total,
+  page,
+  totalPages,
+  itemsPerPage,
+}: {
+  clients: Client[];
+  total: number;
+  page: number;
+  totalPages: number;
+  itemsPerPage: number;
+}) {
   const [searchTerm, setSearchTerm] = useState("");
+  const router = useRouter();
 
   const filteredClients = clients.filter((client) => {
     const searchLower = searchTerm.toLowerCase();
@@ -55,6 +69,10 @@ export function ClientsPageContent({ clients }: { clients: Client[] }) {
       client.phone?.toLowerCase().includes(searchLower)
     );
   });
+
+  const handlePageChange = (newPage: number) => {
+    router.push(`/clients?page=${newPage}`);
+  };
 
   return (
     <main className="flex flex-1 flex-col overflow-hidden">
@@ -98,11 +116,77 @@ export function ClientsPageContent({ clients }: { clients: Client[] }) {
               {!searchTerm && <AddClientDialog />}
             </div>
           ) : (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {filteredClients.map((client) => (
-                <ClientCard key={client.id} client={client} />
-              ))}
-            </div>
+            <>
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {filteredClients.map((client) => (
+                  <ClientCard key={client.id} client={client} />
+                ))}
+              </div>
+
+              {/* Pagination - only show when not searching */}
+              {!searchTerm && totalPages > 1 && (
+                <div className="mt-8 flex items-center justify-between border-t pt-6">
+                  <p className="text-sm text-muted-foreground">
+                    Showing {(page - 1) * itemsPerPage + 1} to{" "}
+                    {Math.min(page * itemsPerPage, total)} of {total} clients
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handlePageChange(page - 1)}
+                      disabled={page === 1}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                      Previous
+                    </Button>
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: totalPages }, (_, i) => i + 1)
+                        .filter((p) => {
+                          // Show first page, last page, current page, and 1 page on each side of current
+                          return (
+                            p === 1 ||
+                            p === totalPages ||
+                            (p >= page - 1 && p <= page + 1)
+                          );
+                        })
+                        .map((p, idx, arr) => {
+                          // Add ellipsis when there's a gap
+                          const prevPage = arr[idx - 1];
+                          const showEllipsis = prevPage && p - prevPage > 1;
+
+                          return (
+                            <div key={p} className="flex items-center gap-1">
+                              {showEllipsis && (
+                                <span className="px-2 text-muted-foreground">
+                                  ...
+                                </span>
+                              )}
+                              <Button
+                                variant={p === page ? "default" : "outline"}
+                                size="sm"
+                                onClick={() => handlePageChange(p)}
+                                className="min-w-[40px]"
+                              >
+                                {p}
+                              </Button>
+                            </div>
+                          );
+                        })}
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handlePageChange(page + 1)}
+                      disabled={page === totalPages}
+                    >
+                      Next
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>

@@ -74,16 +74,31 @@ export async function createPet(formData: FormData) {
   }
 }
 
-export async function getPets() {
-  return await prisma.pet.findMany({
-    orderBy: {
-      createdAt: "desc",
-    },
-    include: {
-      client: true,
-      appointments: true,
-    },
-  });
+export async function getPets(page: number = 1, itemsPerPage: number = 20) {
+  const skip = (page - 1) * itemsPerPage;
+
+  const [pets, total] = await Promise.all([
+    prisma.pet.findMany({
+      skip,
+      take: itemsPerPage,
+      orderBy: {
+        createdAt: "desc",
+      },
+      include: {
+        client: true,
+        appointments: true,
+      },
+    }),
+    prisma.pet.count(),
+  ]);
+
+  return {
+    pets,
+    total,
+    page,
+    itemsPerPage,
+    totalPages: Math.ceil(total / itemsPerPage),
+  };
 }
 
 export async function getPet(id: string) {
