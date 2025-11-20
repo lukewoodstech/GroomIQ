@@ -53,3 +53,15 @@ model Appointment {
 
   @@map("appointments")
 }
+
+model Settings {
+  id                  String   @id @default("default")
+  businessName        String   @default("")
+  businessEmail       String   @default("")
+  businessPhone       String   @default("")
+  defaultDuration     Int      @default(60)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@map("settings")
+}

@@ -30,8 +30,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { createClient, updateClient, deleteClient } from "../actions/clients";
-import { Plus, MoreVertical, Pencil, Trash2, Search } from "lucide-react";
+import { Plus, MoreVertical, Pencil, Trash2, Search, Phone, Mail } from "lucide-react";
 import { toast } from "sonner";
+import Link from "next/link";
 
 type Client = {
   id: string;
@@ -113,30 +114,52 @@ function ClientCard({ client }: { client: Client }) {
   return (
     <div className="rounded-lg border p-4 hover:shadow-md transition-shadow">
       <div className="flex items-start justify-between">
-        <div>
-          <h3 className="font-semibold text-lg">
+        <Link href={`/clients/${client.id}`} className="flex-1">
+          <h3 className="font-semibold text-lg hover:text-primary transition-colors">
             {client.firstName} {client.lastName}
           </h3>
+        </Link>
+        <div className="flex items-center gap-1">
+          {client.phone && (
+            <a
+              href={`tel:${client.phone}`}
+              className="p-1.5 hover:bg-gray-100 rounded"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Phone className="h-4 w-4 text-muted-foreground" />
+            </a>
+          )}
+          {client.email && (
+            <a
+              href={`mailto:${client.email}`}
+              className="p-1.5 hover:bg-gray-100 rounded"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Mail className="h-4 w-4 text-muted-foreground" />
+            </a>
+          )}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8">
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <EditClientDialog client={client} />
+              <DeleteClientDialog client={client} />
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-8 w-8">
-              <MoreVertical className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <EditClientDialog client={client} />
-            <DeleteClientDialog client={client} />
-          </DropdownMenuContent>
-        </DropdownMenu>
       </div>
-      <div className="mt-2 space-y-1 text-sm text-muted-foreground">
-        {client.email && <p>{client.email}</p>}
-        {client.phone && <p>{client.phone}</p>}
-        <p className="mt-2">
-          {client.pets.length} pet{client.pets.length !== 1 ? "s" : ""}
-        </p>
-      </div>
+      <Link href={`/clients/${client.id}`}>
+        <div className="mt-2 space-y-1 text-sm text-muted-foreground">
+          {client.email && <p>{client.email}</p>}
+          {client.phone && <p>{client.phone}</p>}
+          <p className="mt-2">
+            {client.pets.length} pet{client.pets.length !== 1 ? "s" : ""}
+          </p>
+        </div>
+      </Link>
     </div>
   );
 }

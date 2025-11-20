@@ -36,6 +36,23 @@ export async function getClients() {
   });
 }
 
+export async function getClient(id: string) {
+  return await prisma.client.findUnique({
+    where: { id },
+    include: {
+      pets: {
+        include: {
+          appointments: {
+            orderBy: {
+              date: "desc",
+            },
+          },
+        },
+      },
+    },
+  });
+}
+
 export async function updateClient(id: string, formData: FormData) {
   const firstName = formData.get("firstName") as string;
   const lastName = formData.get("lastName") as string;

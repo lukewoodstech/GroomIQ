@@ -42,7 +42,15 @@ export async function getAppointments() {
     include: {
       pet: {
         include: {
-          client: true,
+          client: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              phone: true,
+              email: true,
+            },
+          },
         },
       },
     },
@@ -55,7 +63,15 @@ export async function getPets() {
       name: "asc",
     },
     include: {
-      client: true,
+      client: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          phone: true,
+          email: true,
+        },
+      },
     },
   });
 }
