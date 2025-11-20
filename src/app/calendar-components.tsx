@@ -104,24 +104,28 @@ export function CalendarPageContent({
   const weekStart = startOfWeek(selectedDate, { weekStartsOn: 0 });
   const weekDates = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
-  // Filter appointments based on view mode
+  // Filter appointments for a specific date (no search filter here)
   const getAppointmentsForDate = (date: Date) => {
     return appointments.filter((apt) => {
       const aptDate = new Date(apt.date);
-      const matchesDate = isSameDay(aptDate, date);
-
-      if (!searchTerm) return matchesDate;
-
-      const searchLower = searchTerm.toLowerCase();
-      return (
-        matchesDate &&
-        (apt.pet.name.toLowerCase().includes(searchLower) ||
-          apt.pet.client.firstName.toLowerCase().includes(searchLower) ||
-          apt.pet.client.lastName.toLowerCase().includes(searchLower) ||
-          apt.service?.toLowerCase().includes(searchLower))
-      );
+      return isSameDay(aptDate, date);
     });
   };
+
+  // Search all appointments across all dates
+  const searchResults = searchTerm
+    ? appointments
+        .filter((apt) => {
+          const searchLower = searchTerm.toLowerCase();
+          return (
+            apt.pet.name.toLowerCase().includes(searchLower) ||
+            apt.pet.client.firstName.toLowerCase().includes(searchLower) ||
+            apt.pet.client.lastName.toLowerCase().includes(searchLower) ||
+            apt.service?.toLowerCase().includes(searchLower)
+          );
+        })
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+    : [];
 
   const goToToday = () => setSelectedDate(new Date());
   const goToPrev = () => {
@@ -266,9 +270,19 @@ export function CalendarPageContent({
         </div>
       </div>
 
-      {/* Calendar Grid */}
+      {/* Calendar Grid or Search Results */}
       <div className="flex-1 overflow-auto">
-        {viewMode === "day" ? (
+        {searchTerm ? (
+          <SearchResultsView
+            results={searchResults}
+            pets={pets}
+            searchTerm={searchTerm}
+            onSelectDate={(date) => {
+              setSelectedDate(date);
+              setSearchTerm("");
+            }}
+          />
+        ) : viewMode === "day" ? (
           <DayView
             date={selectedDate}
             appointments={getAppointmentsForDate(selectedDate)}
@@ -396,6 +410,117 @@ function DayView({
             pets={pets}
             onDragStart={onDragStart}
           />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SearchResultsView({
+  results,
+  pets,
+  searchTerm,
+  onSelectDate,
+}: {
+  results: Appointment[];
+  pets: Pet[];
+  searchTerm: string;
+  onSelectDate: (date: Date) => void;
+}) {
+  if (results.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 text-center">
+        <Search className="h-12 w-12 text-muted-foreground mb-4" />
+        <p className="text-muted-foreground">
+          No appointments found for "{searchTerm}"
+        </p>
+      </div>
+    );
+  }
+
+  // Group by date
+  const groupedResults = results.reduce((acc, apt) => {
+    const dateKey = format(new Date(apt.date), "yyyy-MM-dd");
+    if (!acc[dateKey]) {
+      acc[dateKey] = [];
+    }
+    acc[dateKey].push(apt);
+    return acc;
+  }, {} as Record<string, Appointment[]>);
+
+  return (
+    <div className="p-6">
+      <p className="text-sm text-muted-foreground mb-4">
+        Found {results.length} appointment{results.length !== 1 ? "s" : ""} matching "{searchTerm}"
+      </p>
+      <div className="space-y-6">
+        {Object.entries(groupedResults).map(([dateKey, dayAppointments]) => (
+          <div key={dateKey}>
+            <h3
+              className="text-sm font-medium text-muted-foreground mb-3 cursor-pointer hover:text-foreground"
+              onClick={() => onSelectDate(new Date(dateKey))}
+            >
+              {format(new Date(dateKey), "EEEE, MMMM d, yyyy")}
+            </h3>
+            <div className="space-y-2">
+              {dayAppointments.map((apt) => {
+                const aptDate = new Date(apt.date);
+                const endDate = new Date(aptDate.getTime() + apt.duration * 60000);
+
+                return (
+                  <div
+                    key={apt.id}
+                    className="rounded-lg border p-4 bg-white hover:shadow-md transition-shadow cursor-pointer"
+                    onClick={() => onSelectDate(new Date(apt.date))}
+                  >
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h4 className="font-semibold">{apt.pet.name}</h4>
+                        <p className="text-sm text-muted-foreground">
+                          {apt.pet.client.firstName} {apt.pet.client.lastName}
+                        </p>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          {format(aptDate, "h:mm a")} - {format(endDate, "h:mm a")}
+                          {apt.service && ` • ${apt.service}`}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`px-2 py-1 rounded text-xs font-medium ${
+                            apt.status === "completed"
+                              ? "bg-green-100 text-green-800"
+                              : apt.status === "cancelled"
+                              ? "bg-red-100 text-red-800"
+                              : "bg-blue-100 text-blue-800"
+                          }`}
+                        >
+                          {apt.status}
+                        </span>
+                        {apt.pet.client.phone && (
+                          <a
+                            href={`tel:${apt.pet.client.phone}`}
+                            className="p-1 hover:bg-gray-100 rounded"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <Phone className="h-4 w-4 text-muted-foreground" />
+                          </a>
+                        )}
+                        {apt.pet.client.email && (
+                          <a
+                            href={`mailto:${apt.pet.client.email}`}
+                            className="p-1 hover:bg-gray-100 rounded"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <Mail className="h-4 w-4 text-muted-foreground" />
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         ))}
       </div>
     </div>
@@ -660,27 +785,34 @@ function WeekAppointmentBlock({
   // Color based on status
   const bgColor =
     appointment.status === "completed"
-      ? "bg-gray-100"
+      ? "bg-gray-50 border-gray-300"
       : appointment.status === "cancelled"
-      ? "bg-red-50"
-      : "bg-emerald-100";
+      ? "bg-red-50 border-red-300"
+      : "bg-emerald-50 border-emerald-400";
+
+  const endDate = new Date(aptDate.getTime() + appointment.duration * 60000);
+  const tooltipText = `${appointment.pet.name} (${appointment.pet.client.firstName} ${appointment.pet.client.lastName})\n${format(aptDate, "h:mm a")} - ${format(endDate, "h:mm a")}${appointment.service ? `\n${appointment.service}` : ""}`;
 
   return (
     <div
       draggable
       onDragStart={() => onDragStart(appointment)}
-      className={`absolute ${bgColor} rounded p-1 text-xs cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow z-10 overflow-hidden`}
+      title={tooltipText}
+      className={`absolute ${bgColor} rounded border-l-2 p-1.5 text-xs cursor-grab active:cursor-grabbing hover:shadow-md hover:z-20 transition-shadow z-10 overflow-hidden`}
       style={{
         top: `${top}px`,
-        height: `${Math.max(height, 20)}px`,
+        height: `${Math.max(height, 36)}px`,
         left: `calc(5rem + ${dayIndex} * (100% - 5rem) / ${totalDays} + 2px)`,
         width: `calc((100% - 5rem) / ${totalDays} - 4px)`,
       }}
     >
-      <div className="font-medium truncate">{appointment.pet.name}</div>
-      {height > 30 && (
-        <div className="text-muted-foreground truncate">
-          {format(aptDate, "h:mm a")}
+      <div className="font-semibold truncate leading-tight">{appointment.pet.name}</div>
+      <div className="text-muted-foreground truncate leading-tight">
+        {format(aptDate, "h:mma").toLowerCase()}
+      </div>
+      {height > 50 && appointment.service && (
+        <div className="text-muted-foreground truncate leading-tight mt-0.5">
+          {appointment.service}
         </div>
       )}
     </div>

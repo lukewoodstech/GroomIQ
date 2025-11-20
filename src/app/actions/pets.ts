@@ -41,6 +41,18 @@ export async function getPets() {
   });
 }
 
+export async function getPet(id: string) {
+  return await prisma.pet.findUnique({
+    where: { id },
+    include: {
+      client: true,
+      appointments: {
+        orderBy: { date: "desc" },
+      },
+    },
+  });
+}
+
 export async function getClients() {
   return await prisma.client.findMany({
     orderBy: {

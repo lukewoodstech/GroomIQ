@@ -33,6 +33,7 @@ import { createPet, updatePet, deletePet } from "../actions/pets";
 import { Plus, MoreVertical, Pencil, Trash2, Search, PawPrint } from "lucide-react";
 import { toast } from "sonner";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import Link from "next/link";
 
 type Client = {
   id: string;
@@ -129,15 +130,32 @@ export function PetsPageContent({
 
 function PetCard({ pet, clients }: { pet: Pet; clients: Client[] }) {
   return (
-    <div className="rounded-lg border p-4 hover:shadow-md transition-shadow">
-      <div className="flex items-start justify-between">
-        <div>
-          <h3 className="font-semibold text-lg">{pet.name}</h3>
-          <p className="text-sm text-muted-foreground">
-            {pet.species}
-            {pet.breed && ` • ${pet.breed}`}
+    <div className="relative rounded-lg border hover:shadow-md transition-shadow">
+      <Link href={`/pets/${pet.id}`} className="block p-4">
+        <div className="flex items-start justify-between">
+          <div>
+            <h3 className="font-semibold text-lg">{pet.name}</h3>
+            <p className="text-sm text-muted-foreground">
+              {pet.species}
+              {pet.breed && ` • ${pet.breed}`}
+            </p>
+          </div>
+          {/* Spacer for dropdown button */}
+          <div className="h-8 w-8" />
+        </div>
+        <div className="mt-3 space-y-1 text-sm text-muted-foreground">
+          <p>
+            Owner: {pet.client.firstName} {pet.client.lastName}
+          </p>
+          {pet.age && <p>Age: {pet.age} years</p>}
+          <p className="mt-2">
+            {pet.appointments.length} appointment
+            {pet.appointments.length !== 1 ? "s" : ""}
           </p>
         </div>
+      </Link>
+      {/* Dropdown positioned absolutely to not interfere with Link */}
+      <div className="absolute top-4 right-4">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -149,16 +167,6 @@ function PetCard({ pet, clients }: { pet: Pet; clients: Client[] }) {
             <DeletePetDialog pet={pet} />
           </DropdownMenuContent>
         </DropdownMenu>
-      </div>
-      <div className="mt-3 space-y-1 text-sm text-muted-foreground">
-        <p>
-          Owner: {pet.client.firstName} {pet.client.lastName}
-        </p>
-        {pet.age && <p>Age: {pet.age} years</p>}
-        <p className="mt-2">
-          {pet.appointments.length} appointment
-          {pet.appointments.length !== 1 ? "s" : ""}
-        </p>
       </div>
     </div>
   );
