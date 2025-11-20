@@ -60,8 +60,25 @@ model Settings {
   businessEmail       String   @default("")
   businessPhone       String   @default("")
   defaultDuration     Int      @default(60)
+  openTime            String   @default("09:00")
+  closeTime           String   @default("17:00")
+  daysOpen            String   @default("1,2,3,4,5") // Comma-separated day numbers (0=Sunday, 6=Saturday)
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 
   @@map("settings")
+}
+
+model Service {
+  id          String   @id @default(cuid())
+  name        String
+  duration    Int      @default(60) // default duration in minutes
+  price       Float?   // optional price
+  description String?
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("services")
 }

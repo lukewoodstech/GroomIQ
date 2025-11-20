@@ -24,6 +24,9 @@ const settingsSchema = z.object({
     .int("Duration must be a whole number")
     .min(15, "Duration must be at least 15 minutes")
     .max(480, "Duration cannot exceed 8 hours"),
+  openTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "Invalid time format (HH:MM)"),
+  closeTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "Invalid time format (HH:MM)"),
+  daysOpen: z.string(),
 });
 
 export async function getSettings() {
@@ -49,6 +52,9 @@ export async function updateSettings(formData: FormData) {
       businessEmail: formData.get("businessEmail") || "",
       businessPhone: formData.get("businessPhone") || "",
       defaultDuration: durationValue ? Number(durationValue) : 60,
+      openTime: formData.get("openTime") || "09:00",
+      closeTime: formData.get("closeTime") || "17:00",
+      daysOpen: formData.get("daysOpen") || "1,2,3,4,5",
     };
 
     const validated = settingsSchema.parse(rawData);
@@ -60,6 +66,9 @@ export async function updateSettings(formData: FormData) {
         businessEmail: validated.businessEmail,
         businessPhone: validated.businessPhone,
         defaultDuration: validated.defaultDuration,
+        openTime: validated.openTime,
+        closeTime: validated.closeTime,
+        daysOpen: validated.daysOpen,
       },
       create: {
         id: "default",
@@ -67,6 +76,9 @@ export async function updateSettings(formData: FormData) {
         businessEmail: validated.businessEmail,
         businessPhone: validated.businessPhone,
         defaultDuration: validated.defaultDuration,
+        openTime: validated.openTime,
+        closeTime: validated.closeTime,
+        daysOpen: validated.daysOpen,
       },
     });
 
