@@ -77,15 +77,16 @@ export function ClientsPageContent({
   return (
     <main className="flex flex-1 flex-col overflow-hidden">
       {/* Header */}
-      <header className="border-b bg-background">
-        <div className="flex h-16 items-center justify-between px-6">
+      <header className="border-b bg-card shadow-sm">
+        <div className="flex h-20 items-center justify-between px-6">
           <div className="flex flex-1 items-center gap-4">
+            <h2 className="text-2xl font-bold hidden sm:block">Clients</h2>
             <div className="relative w-full max-w-md">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 type="search"
                 placeholder="Search clients..."
-                className="pl-9 w-full"
+                className="pl-9 w-full h-10 rounded-xl"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
@@ -98,9 +99,9 @@ export function ClientsPageContent({
       {/* Content */}
       <div className="flex-1 overflow-y-auto">
         <div className="p-6">
-          <div className="mb-6">
-            <h1 className="text-3xl font-semibold">Clients</h1>
-            <p className="text-muted-foreground mt-1">
+          <div className="mb-8">
+            <h1 className="text-4xl font-bold tracking-tight">All Clients</h1>
+            <p className="text-muted-foreground mt-2 text-lg">
               Manage your client database
             </p>
           </div>
@@ -196,7 +197,7 @@ export function ClientsPageContent({
 
 function ClientCard({ client }: { client: Client }) {
   return (
-    <div className="rounded-lg border p-4 hover:shadow-md transition-shadow">
+    <div className="rounded-xl border-2 bg-card p-5 hover:shadow-lg hover:border-primary/30 transition-all duration-200">
       <div className="flex items-start justify-between">
         <Link href={`/clients/${client.id}`} className="flex-1">
           <h3 className="font-semibold text-lg hover:text-primary transition-colors">
@@ -207,19 +208,19 @@ function ClientCard({ client }: { client: Client }) {
           {client.phone && (
             <a
               href={`tel:${client.phone}`}
-              className="p-1.5 hover:bg-gray-100 rounded"
+              className="p-1.5 hover:bg-accent rounded-lg transition-colors"
               onClick={(e) => e.stopPropagation()}
             >
-              <Phone className="h-4 w-4 text-muted-foreground" />
+              <Phone className="h-4 w-4 text-muted-foreground hover:text-foreground" />
             </a>
           )}
           {client.email && (
             <a
               href={`mailto:${client.email}`}
-              className="p-1.5 hover:bg-gray-100 rounded"
+              className="p-1.5 hover:bg-accent rounded-lg transition-colors"
               onClick={(e) => e.stopPropagation()}
             >
-              <Mail className="h-4 w-4 text-muted-foreground" />
+              <Mail className="h-4 w-4 text-muted-foreground hover:text-foreground" />
             </a>
           )}
           <DropdownMenu>
@@ -264,8 +265,8 @@ function AddClientDialog() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button>
-          <Plus className="h-4 w-4 mr-2" />
+        <Button className="h-10 px-6 font-semibold shadow-lg shadow-primary/20 rounded-xl">
+          <Plus className="h-5 w-5 mr-2" />
           Add Client
         </Button>
       </DialogTrigger>

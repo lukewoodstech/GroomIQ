@@ -39,12 +39,12 @@ export function Sidebar() {
   return (
     <>
       {/* Mobile Header */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-50 flex h-14 items-center justify-between border-b bg-background px-4">
+      <div className="md:hidden fixed top-0 left-0 right-0 z-50 flex h-14 items-center justify-between border-b bg-card shadow-sm px-4">
         <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground font-semibold text-sm">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary/80 text-primary-foreground font-bold text-sm shadow-sm">
             G
           </div>
-          <span className="font-semibold">GroomIQ</span>
+          <span className="font-bold text-lg">GroomIQ</span>
         </div>
         <Sheet open={open} onOpenChange={setOpen}>
           <SheetTrigger asChild>
@@ -53,15 +53,15 @@ export function Sidebar() {
             </Button>
           </SheetTrigger>
           <SheetContent side="left" className="w-64 p-0">
-            <SheetHeader className="border-b p-4">
+            <SheetHeader className="border-b p-4 bg-card">
               <SheetTitle className="flex items-center gap-2">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground font-semibold text-sm">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary/80 text-primary-foreground font-bold shadow-sm">
                   G
                 </div>
-                GroomIQ
+                <span className="font-bold text-lg">GroomIQ</span>
               </SheetTitle>
             </SheetHeader>
-            <nav className="flex flex-col gap-1 p-4">
+            <nav className="flex flex-col gap-2 p-4">
               {navigation.map((item) => {
                 const isActive = pathname === item.href ||
                   (item.href !== "/" && pathname.startsWith(item.href));
@@ -73,9 +73,9 @@ export function Sidebar() {
                     href={item.href}
                     onClick={() => setOpen(false)}
                     className={cn(
-                      "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                      "flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition-all duration-200",
                       isActive
-                        ? "bg-primary text-primary-foreground"
+                        ? "bg-gradient-to-r from-primary to-primary/80 text-primary-foreground shadow-md shadow-primary/20"
                         : "text-muted-foreground hover:bg-accent hover:text-foreground"
                     )}
                   >
@@ -100,16 +100,16 @@ export function Sidebar() {
       </div>
 
       {/* Desktop Sidebar */}
-      <div className="hidden md:flex h-screen w-16 flex-col border-r bg-muted/40">
+      <div className="hidden md:flex h-screen w-16 flex-col border-r bg-card shadow-sm">
         {/* Logo */}
         <div className="flex h-16 items-center justify-center border-b">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground font-semibold">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary/80 text-primary-foreground font-bold text-lg shadow-md shadow-primary/20">
             G
           </div>
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 space-y-1 p-3">
+        <nav className="flex-1 space-y-2 p-3">
           {navigation.map((item) => {
             const isActive = pathname === item.href ||
               (item.href !== "/" && pathname.startsWith(item.href));
@@ -120,10 +120,10 @@ export function Sidebar() {
                 key={item.name}
                 href={item.href}
                 className={cn(
-                  "flex h-10 w-10 items-center justify-center rounded-lg transition-colors",
+                  "flex h-11 w-11 items-center justify-center rounded-xl transition-all duration-200",
                   isActive
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                    ? "bg-gradient-to-br from-primary to-primary/80 text-primary-foreground shadow-md shadow-primary/20 scale-105"
+                    : "text-muted-foreground hover:bg-accent hover:text-foreground hover:scale-105"
                 )}
                 title={item.name}
               >
@@ -139,7 +139,7 @@ export function Sidebar() {
             variant="ghost"
             size="icon"
             onClick={() => signOut({ callbackUrl: "/login" })}
-            className="h-10 w-10 text-muted-foreground hover:bg-accent hover:text-foreground"
+            className="h-11 w-11 rounded-xl text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-all duration-200"
             title="Sign out"
           >
             <LogOut className="h-5 w-5" />

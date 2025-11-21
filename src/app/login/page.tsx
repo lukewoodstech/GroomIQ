@@ -19,6 +19,18 @@ export default function LoginPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+
+    // Basic client-side validation
+    if (!email || !password) {
+      setError("Please enter both email and password");
+      return;
+    }
+
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters");
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -29,25 +41,29 @@ export default function LoginPage() {
       });
 
       if (result?.error) {
-        setError("Invalid email or password");
+        setError("Invalid email or password. Please try again.");
       } else {
         router.push("/");
         router.refresh();
       }
     } catch (error) {
-      setError("An error occurred. Please try again.");
+      console.error("Login error:", error);
+      setError("An unexpected error occurred. Please try again.");
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12 sm:px-6 lg:px-8">
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold">Sign in to GroomIQ</CardTitle>
-          <CardDescription>
-            Enter your email and password to access your account
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background via-accent/5 to-primary/5 px-4 py-12 sm:px-6 lg:px-8">
+      <Card className="w-full max-w-md shadow-xl border-2">
+        <CardHeader className="space-y-3 text-center">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-primary/80 text-primary-foreground font-bold text-2xl shadow-lg shadow-primary/30">
+            G
+          </div>
+          <CardTitle className="text-3xl font-bold">Welcome back</CardTitle>
+          <CardDescription className="text-base">
+            Sign in to your GroomIQ account
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -83,20 +99,20 @@ export default function LoginPage() {
               </div>
             )}
 
-            <Button type="submit" className="w-full" disabled={loading}>
+            <Button type="submit" className="w-full h-11 text-base font-semibold shadow-lg shadow-primary/20" disabled={loading}>
               {loading ? "Signing in..." : "Sign in"}
             </Button>
 
-            <div className="text-center text-sm text-gray-600">
+            <div className="text-center text-sm">
               Don&apos;t have an account?{" "}
-              <Link href="/signup" className="font-medium text-blue-600 hover:text-blue-500">
+              <Link href="/signup" className="font-semibold text-primary hover:text-primary/80 transition-colors">
                 Sign up
               </Link>
             </div>
 
-            <div className="mt-4 rounded-md border border-blue-200 bg-blue-50 p-3">
-              <p className="text-sm font-medium text-blue-900">Demo Account</p>
-              <p className="mt-1 text-xs text-blue-700">
+            <div className="mt-4 rounded-xl border-2 border-primary/20 bg-primary/5 p-4">
+              <p className="text-sm font-bold text-primary">Demo Account</p>
+              <p className="mt-2 text-sm text-foreground/70 font-mono">
                 Email: demo@groomiq.com
                 <br />
                 Password: demo1234

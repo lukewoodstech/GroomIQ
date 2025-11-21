@@ -14,12 +14,25 @@ export default function SignupPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+
+    // Validate password confirmation
+    if (password !== confirmPassword) {
+      setError("Passwords do not match");
+      return;
+    }
+
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters long");
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -59,12 +72,15 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12 sm:px-6 lg:px-8">
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold">Create an account</CardTitle>
-          <CardDescription>
-            Enter your information to create your GroomIQ account
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background via-accent/5 to-primary/5 px-4 py-12 sm:px-6 lg:px-8">
+      <Card className="w-full max-w-md shadow-xl border-2">
+        <CardHeader className="space-y-3 text-center">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-primary/80 text-primary-foreground font-bold text-2xl shadow-lg shadow-primary/30">
+            G
+          </div>
+          <CardTitle className="text-3xl font-bold">Get started</CardTitle>
+          <CardDescription className="text-base">
+            Create your GroomIQ account
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -105,6 +121,19 @@ export default function SignupPage() {
                 minLength={8}
                 disabled={loading}
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="confirmPassword">Confirm Password</Label>
+              <Input
+                id="confirmPassword"
+                type="password"
+                placeholder="••••••••"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+                minLength={8}
+                disabled={loading}
+              />
               <p className="text-xs text-gray-500">
                 Password must be at least 8 characters long
               </p>
@@ -116,13 +145,13 @@ export default function SignupPage() {
               </div>
             )}
 
-            <Button type="submit" className="w-full" disabled={loading}>
+            <Button type="submit" className="w-full h-11 text-base font-semibold shadow-lg shadow-primary/20" disabled={loading}>
               {loading ? "Creating account..." : "Create account"}
             </Button>
 
-            <div className="text-center text-sm text-gray-600">
+            <div className="text-center text-sm">
               Already have an account?{" "}
-              <Link href="/login" className="font-medium text-blue-600 hover:text-blue-500">
+              <Link href="/login" className="font-semibold text-primary hover:text-primary/80 transition-colors">
                 Sign in
               </Link>
             </div>
