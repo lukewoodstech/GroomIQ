@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { auth } from "@/auth";
 
 // Validation schemas
 const appointmentSchema = z.object({
@@ -24,6 +25,7 @@ const statusSchema = z.enum(["scheduled", "completed", "cancelled"]);
 async function checkAppointmentConflict(
   dateTime: Date,
   duration: number,
+  userId: string,
   excludeId?: string
 ): Promise<{ hasConflict: boolean; conflictingAppointment?: any }> {
   const endTime = new Date(dateTime.getTime() + duration * 60000);
@@ -31,6 +33,7 @@ async function checkAppointmentConflict(
   const conflicts = await prisma.appointment.findMany({
     where: {
       AND: [
+        { userId },
         { id: excludeId ? { not: excludeId } : undefined },
         { status: "scheduled" },
         {
@@ -80,6 +83,12 @@ async function checkAppointmentConflict(
 
 export async function createAppointment(formData: FormData) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      throw new Error("Unauthorized");
+    }
+    const userId = session.user.id;
+
     // Parse and validate input
     const rawData = {
       petId: formData.get("petId"),
@@ -103,7 +112,8 @@ export async function createAppointment(formData: FormData) {
     // Check for conflicts
     const { hasConflict, conflictingAppointment } = await checkAppointmentConflict(
       dateTime,
-      validated.duration
+      validated.duration,
+      userId
     );
 
     if (hasConflict) {
@@ -116,9 +126,12 @@ export async function createAppointment(formData: FormData) {
       );
     }
 
-    // Verify pet exists
-    const pet = await prisma.pet.findUnique({
-      where: { id: validated.petId },
+    // Verify pet exists and belongs to user
+    const pet = await prisma.pet.findFirst({
+      where: {
+        id: validated.petId,
+        userId
+      },
     });
 
     if (!pet) {
@@ -128,6 +141,7 @@ export async function createAppointment(formData: FormData) {
     await prisma.appointment.create({
       data: {
         petId: validated.petId,
+        userId,
         date: dateTime,
         duration: validated.duration,
         service: validated.service,
@@ -146,7 +160,13 @@ export async function createAppointment(formData: FormData) {
 }
 
 export async function getAppointments() {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return [];
+  }
+
   return await prisma.appointment.findMany({
+    where: { userId: session.user.id },
     orderBy: {
       date: "asc",
     },
@@ -169,7 +189,13 @@ export async function getAppointments() {
 }
 
 export async function getPets() {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return [];
+  }
+
   return await prisma.pet.findMany({
+    where: { userId: session.user.id },
     orderBy: {
       name: "asc",
     },
@@ -189,6 +215,21 @@ export async function getPets() {
 
 export async function updateAppointment(id: string, formData: FormData) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      throw new Error("Unauthorized");
+    }
+    const userId = session.user.id;
+
+    // Verify appointment belongs to user
+    const existingAppointment = await prisma.appointment.findFirst({
+      where: { id, userId },
+    });
+
+    if (!existingAppointment) {
+      throw new Error("Appointment not found");
+    }
+
     // Parse and validate input
     const rawData = {
       petId: formData.get("petId"),
@@ -209,6 +250,7 @@ export async function updateAppointment(id: string, formData: FormData) {
     const { hasConflict, conflictingAppointment } = await checkAppointmentConflict(
       dateTime,
       validated.duration,
+      userId,
       id
     );
 
@@ -246,7 +288,21 @@ export async function updateAppointment(id: string, formData: FormData) {
 
 export async function updateAppointmentStatus(id: string, status: string) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      throw new Error("Unauthorized");
+    }
+
     const validated = statusSchema.parse(status);
+
+    // Verify appointment belongs to user
+    const appointment = await prisma.appointment.findFirst({
+      where: { id, userId: session.user.id },
+    });
+
+    if (!appointment) {
+      throw new Error("Appointment not found");
+    }
 
     await prisma.appointment.update({
       where: { id },
@@ -264,6 +320,20 @@ export async function updateAppointmentStatus(id: string, status: string) {
 }
 
 export async function deleteAppointment(id: string) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    throw new Error("Unauthorized");
+  }
+
+  // Verify appointment belongs to user
+  const appointment = await prisma.appointment.findFirst({
+    where: { id, userId: session.user.id },
+  });
+
+  if (!appointment) {
+    throw new Error("Appointment not found");
+  }
+
   await prisma.appointment.delete({
     where: { id },
   });

@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { auth } from "@/auth";
 
 // Validation schema
 const settingsSchema = z.object({
@@ -30,14 +31,19 @@ const settingsSchema = z.object({
 });
 
 export async function getSettings() {
-  // Get or create default settings
+  const session = await auth();
+  if (!session?.user?.id) {
+    return null;
+  }
+
+  // Get or create default settings for this user
   let settings = await prisma.settings.findUnique({
-    where: { id: "default" },
+    where: { userId: session.user.id },
   });
 
   if (!settings) {
     settings = await prisma.settings.create({
-      data: { id: "default" },
+      data: { userId: session.user.id },
     });
   }
 
@@ -46,6 +52,12 @@ export async function getSettings() {
 
 export async function updateSettings(formData: FormData) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      throw new Error("Unauthorized");
+    }
+    const userId = session.user.id;
+
     const durationValue = formData.get("defaultDuration");
     const rawData = {
       businessName: formData.get("businessName") || "",
@@ -60,7 +72,7 @@ export async function updateSettings(formData: FormData) {
     const validated = settingsSchema.parse(rawData);
 
     await prisma.settings.upsert({
-      where: { id: "default" },
+      where: { userId },
       update: {
         businessName: validated.businessName,
         businessEmail: validated.businessEmail,
@@ -71,7 +83,7 @@ export async function updateSettings(formData: FormData) {
         daysOpen: validated.daysOpen,
       },
       create: {
-        id: "default",
+        userId,
         businessName: validated.businessName,
         businessEmail: validated.businessEmail,
         businessPhone: validated.businessPhone,

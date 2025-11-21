@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+import { signOut } from "next-auth/react";
 import {
   LayoutDashboard,
   Users,
@@ -11,6 +12,7 @@ import {
   Settings,
   Menu,
   X,
+  LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -82,6 +84,16 @@ export function Sidebar() {
                   </Link>
                 );
               })}
+              <div className="mt-auto pt-4 border-t">
+                <Button
+                  variant="ghost"
+                  onClick={() => signOut({ callbackUrl: "/login" })}
+                  className="w-full justify-start gap-3 text-muted-foreground hover:bg-accent hover:text-foreground"
+                >
+                  <LogOut className="h-5 w-5" />
+                  Sign out
+                </Button>
+              </div>
             </nav>
           </SheetContent>
         </Sheet>
@@ -120,6 +132,19 @@ export function Sidebar() {
             );
           })}
         </nav>
+
+        {/* Sign Out Button */}
+        <div className="p-3 border-t">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => signOut({ callbackUrl: "/login" })}
+            className="h-10 w-10 text-muted-foreground hover:bg-accent hover:text-foreground"
+            title="Sign out"
+          >
+            <LogOut className="h-5 w-5" />
+          </Button>
+        </div>
       </div>
     </>
   );

@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { auth } from "@/auth";
 
 // Validation schema
 const petSchema = z.object({
@@ -32,6 +33,12 @@ const petSchema = z.object({
 
 export async function createPet(formData: FormData) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      throw new Error("Unauthorized");
+    }
+    const userId = session.user.id;
+
     const ageValue = formData.get("age");
     const rawData = {
       name: formData.get("name"),
@@ -44,9 +51,12 @@ export async function createPet(formData: FormData) {
 
     const validated = petSchema.parse(rawData);
 
-    // Verify client exists
-    const client = await prisma.client.findUnique({
-      where: { id: validated.clientId },
+    // Verify client exists and belongs to user
+    const client = await prisma.client.findFirst({
+      where: {
+        id: validated.clientId,
+        userId,
+      },
     });
 
     if (!client) {
@@ -61,6 +71,7 @@ export async function createPet(formData: FormData) {
         age: validated.age,
         notes: validated.notes,
         clientId: validated.clientId,
+        userId,
       },
     });
 
@@ -75,10 +86,22 @@ export async function createPet(formData: FormData) {
 }
 
 export async function getPets(page: number = 1, itemsPerPage: number = 20) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return {
+      pets: [],
+      total: 0,
+      page,
+      itemsPerPage,
+      totalPages: 0,
+    };
+  }
+
   const skip = (page - 1) * itemsPerPage;
 
   const [pets, total] = await Promise.all([
     prisma.pet.findMany({
+      where: { userId: session.user.id },
       skip,
       take: itemsPerPage,
       orderBy: {
@@ -89,7 +112,9 @@ export async function getPets(page: number = 1, itemsPerPage: number = 20) {
         appointments: true,
       },
     }),
-    prisma.pet.count(),
+    prisma.pet.count({
+      where: { userId: session.user.id },
+    }),
   ]);
 
   return {
@@ -102,8 +127,16 @@ export async function getPets(page: number = 1, itemsPerPage: number = 20) {
 }
 
 export async function getPet(id: string) {
-  return await prisma.pet.findUnique({
-    where: { id },
+  const session = await auth();
+  if (!session?.user?.id) {
+    return null;
+  }
+
+  return await prisma.pet.findFirst({
+    where: {
+      id,
+      userId: session.user.id,
+    },
     include: {
       client: true,
       appointments: {
@@ -114,7 +147,13 @@ export async function getPet(id: string) {
 }
 
 export async function getClients() {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return [];
+  }
+
   return await prisma.client.findMany({
+    where: { userId: session.user.id },
     orderBy: {
       lastName: "asc",
     },
@@ -123,6 +162,21 @@ export async function getClients() {
 
 export async function updatePet(id: string, formData: FormData) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      throw new Error("Unauthorized");
+    }
+    const userId = session.user.id;
+
+    // Verify pet belongs to user
+    const existingPet = await prisma.pet.findFirst({
+      where: { id, userId },
+    });
+
+    if (!existingPet) {
+      throw new Error("Pet not found");
+    }
+
     const ageValue = formData.get("age");
     const rawData = {
       name: formData.get("name"),
@@ -135,9 +189,12 @@ export async function updatePet(id: string, formData: FormData) {
 
     const validated = petSchema.parse(rawData);
 
-    // Verify client exists
-    const client = await prisma.client.findUnique({
-      where: { id: validated.clientId },
+    // Verify client exists and belongs to user
+    const client = await prisma.client.findFirst({
+      where: {
+        id: validated.clientId,
+        userId,
+      },
     });
 
     if (!client) {
@@ -167,9 +224,17 @@ export async function updatePet(id: string, formData: FormData) {
 }
 
 export async function deletePet(id: string) {
-  // Check appointment count before deletion
-  const pet = await prisma.pet.findUnique({
-    where: { id },
+  const session = await auth();
+  if (!session?.user?.id) {
+    throw new Error("Unauthorized");
+  }
+
+  // Check pet belongs to user and get appointment count
+  const pet = await prisma.pet.findFirst({
+    where: {
+      id,
+      userId: session.user.id,
+    },
     include: {
       _count: {
         select: { appointments: true },

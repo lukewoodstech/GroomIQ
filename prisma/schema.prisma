@@ -6,8 +6,71 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// NextAuth.js Models
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  accounts      Account[]
+  sessions      Session[]
+
+  // Business data
+  clients       Client[]
+  pets          Pet[]
+  appointments  Appointment[]
+  services      Service[]
+  settings      Settings?
+
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
 }
 
 model Client {
@@ -16,6 +79,8 @@ model Client {
   lastName  String
   email     String?
   phone     String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   pets      Pet[]
@@ -32,6 +97,8 @@ model Pet {
   notes       String?
   clientId    String
   client      Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
   appointments Appointment[]
@@ -43,6 +110,8 @@ model Appointment {
   id          String   @id @default(cuid())
   petId       String
   pet         Pet      @relation(fields: [petId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   date        DateTime
   duration    Int      @default(60) // minutes
   service     String?  // "Full Groom", "Bath", "Nail Trim", etc.
@@ -55,7 +124,9 @@ model Appointment {
 }
 
 model Settings {
-  id                  String   @id @default("default")
+  id                  String   @id @default(cuid())
+  userId              String   @unique
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   businessName        String   @default("")
   businessEmail       String   @default("")
   businessPhone       String   @default("")
@@ -77,6 +148,8 @@ model Service {
   description String?
   isActive    Boolean  @default(true)
   sortOrder   Int      @default(0)
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

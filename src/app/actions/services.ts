@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { auth } from "@/auth";
 
 // Validation schema
 const serviceSchema = z.object({
@@ -24,7 +25,13 @@ const serviceSchema = z.object({
 });
 
 export async function getServices() {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return [];
+  }
+
   return await prisma.service.findMany({
+    where: { userId: session.user.id },
     orderBy: {
       sortOrder: "asc",
     },
@@ -32,8 +39,14 @@ export async function getServices() {
 }
 
 export async function getActiveServices() {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return [];
+  }
+
   return await prisma.service.findMany({
     where: {
+      userId: session.user.id,
       isActive: true,
     },
     orderBy: {
@@ -44,6 +57,12 @@ export async function getActiveServices() {
 
 export async function createService(formData: FormData) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      throw new Error("Unauthorized");
+    }
+    const userId = session.user.id;
+
     const priceValue = formData.get("price");
     const rawData = {
       name: formData.get("name"),
@@ -56,9 +75,10 @@ export async function createService(formData: FormData) {
 
     const validated = serviceSchema.parse(rawData);
 
-    // Check for duplicate service name
+    // Check for duplicate service name within user's services
     const existing = await prisma.service.findFirst({
       where: {
+        userId,
         name: validated.name,
       },
     });
@@ -75,6 +95,7 @@ export async function createService(formData: FormData) {
         description: validated.description,
         isActive: validated.isActive,
         sortOrder: validated.sortOrder,
+        userId,
       },
     });
 
@@ -90,6 +111,21 @@ export async function createService(formData: FormData) {
 
 export async function updateService(id: string, formData: FormData) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      throw new Error("Unauthorized");
+    }
+    const userId = session.user.id;
+
+    // Verify service belongs to user
+    const existingService = await prisma.service.findFirst({
+      where: { id, userId },
+    });
+
+    if (!existingService) {
+      throw new Error("Service not found");
+    }
+
     const priceValue = formData.get("price");
     const rawData = {
       name: formData.get("name"),
@@ -102,9 +138,10 @@ export async function updateService(id: string, formData: FormData) {
 
     const validated = serviceSchema.parse(rawData);
 
-    // Check for duplicate service name (excluding current service)
+    // Check for duplicate service name (excluding current service, within user's services)
     const existing = await prisma.service.findFirst({
       where: {
+        userId,
         AND: [{ id: { not: id } }, { name: validated.name }],
       },
     });
@@ -136,6 +173,23 @@ export async function updateService(id: string, formData: FormData) {
 }
 
 export async function deleteService(id: string) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    throw new Error("Unauthorized");
+  }
+
+  // Verify service belongs to user
+  const service = await prisma.service.findFirst({
+    where: {
+      id,
+      userId: session.user.id,
+    },
+  });
+
+  if (!service) {
+    throw new Error("Service not found");
+  }
+
   await prisma.service.delete({
     where: { id },
   });
@@ -145,8 +199,17 @@ export async function deleteService(id: string) {
 }
 
 export async function toggleServiceActive(id: string) {
-  const service = await prisma.service.findUnique({
-    where: { id },
+  const session = await auth();
+  if (!session?.user?.id) {
+    throw new Error("Unauthorized");
+  }
+
+  // Verify service belongs to user
+  const service = await prisma.service.findFirst({
+    where: {
+      id,
+      userId: session.user.id,
+    },
   });
 
   if (!service) {

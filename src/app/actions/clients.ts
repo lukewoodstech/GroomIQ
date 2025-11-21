@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { auth } from "@/auth";
 
 // Validation schema
 const clientSchema = z.object({
@@ -24,6 +25,12 @@ const clientSchema = z.object({
 
 export async function createClient(formData: FormData) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      throw new Error("Unauthorized");
+    }
+    const userId = session.user.id;
+
     const rawData = {
       firstName: formData.get("firstName"),
       lastName: formData.get("lastName"),
@@ -33,10 +40,11 @@ export async function createClient(formData: FormData) {
 
     const validated = clientSchema.parse(rawData);
 
-    // Check for potential duplicates
+    // Check for potential duplicates within user's clients
     if (validated.email || validated.phone) {
       const existing = await prisma.client.findFirst({
         where: {
+          userId,
           OR: [
             validated.email ? { email: validated.email } : {},
             validated.phone ? { phone: validated.phone } : {},
@@ -60,6 +68,7 @@ export async function createClient(formData: FormData) {
         lastName: validated.lastName,
         email: validated.email,
         phone: validated.phone,
+        userId,
       },
     });
 
@@ -74,10 +83,22 @@ export async function createClient(formData: FormData) {
 }
 
 export async function getClients(page: number = 1, itemsPerPage: number = 20) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return {
+      clients: [],
+      total: 0,
+      page,
+      itemsPerPage,
+      totalPages: 0,
+    };
+  }
+
   const skip = (page - 1) * itemsPerPage;
 
   const [clients, total] = await Promise.all([
     prisma.client.findMany({
+      where: { userId: session.user.id },
       skip,
       take: itemsPerPage,
       orderBy: {
@@ -87,7 +108,9 @@ export async function getClients(page: number = 1, itemsPerPage: number = 20) {
         pets: true,
       },
     }),
-    prisma.client.count(),
+    prisma.client.count({
+      where: { userId: session.user.id },
+    }),
   ]);
 
   return {
@@ -100,8 +123,16 @@ export async function getClients(page: number = 1, itemsPerPage: number = 20) {
 }
 
 export async function getClient(id: string) {
-  return await prisma.client.findUnique({
-    where: { id },
+  const session = await auth();
+  if (!session?.user?.id) {
+    return null;
+  }
+
+  return await prisma.client.findFirst({
+    where: {
+      id,
+      userId: session.user.id,
+    },
     include: {
       pets: {
         include: {
@@ -118,6 +149,21 @@ export async function getClient(id: string) {
 
 export async function updateClient(id: string, formData: FormData) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      throw new Error("Unauthorized");
+    }
+    const userId = session.user.id;
+
+    // Verify client belongs to user
+    const existingClient = await prisma.client.findFirst({
+      where: { id, userId },
+    });
+
+    if (!existingClient) {
+      throw new Error("Client not found");
+    }
+
     const rawData = {
       firstName: formData.get("firstName"),
       lastName: formData.get("lastName"),
@@ -127,10 +173,11 @@ export async function updateClient(id: string, formData: FormData) {
 
     const validated = clientSchema.parse(rawData);
 
-    // Check for potential duplicates (excluding current client)
+    // Check for potential duplicates (excluding current client, within user's clients)
     if (validated.email || validated.phone) {
       const existing = await prisma.client.findFirst({
         where: {
+          userId,
           AND: [
             { id: { not: id } },
             {
@@ -174,9 +221,17 @@ export async function updateClient(id: string, formData: FormData) {
 }
 
 export async function deleteClient(id: string) {
-  // Check if client has appointments
-  const client = await prisma.client.findUnique({
-    where: { id },
+  const session = await auth();
+  if (!session?.user?.id) {
+    throw new Error("Unauthorized");
+  }
+
+  // Check if client belongs to user and has appointments
+  const client = await prisma.client.findFirst({
+    where: {
+      id,
+      userId: session.user.id,
+    },
     include: {
       pets: {
         include: {

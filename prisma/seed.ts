@@ -1,9 +1,24 @@
 import { PrismaClient } from "@prisma/client";
+import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
 async function main() {
   console.log("Seeding database...");
+
+  // Create default demo user
+  const hashedPassword = await bcrypt.hash("demo1234", 10);
+  const demoUser = await prisma.user.upsert({
+    where: { email: "demo@groomiq.com" },
+    update: {},
+    create: {
+      email: "demo@groomiq.com",
+      name: "Demo User",
+      password: hashedPassword,
+    },
+  });
+
+  console.log("✓ Created demo user (demo@groomiq.com / demo1234)");
 
   // Seed default services
   const services = [
@@ -16,11 +31,14 @@ async function main() {
 
   for (const service of services) {
     const existing = await prisma.service.findFirst({
-      where: { name: service.name },
+      where: { name: service.name, userId: demoUser.id },
     });
     if (!existing) {
       await prisma.service.create({
-        data: service,
+        data: {
+          ...service,
+          userId: demoUser.id,
+        },
       });
     }
   }
@@ -28,11 +46,17 @@ async function main() {
   console.log("✓ Seeded 5 default services");
 
   // Ensure default settings exist
-  await prisma.settings.upsert({
-    where: { id: "default" },
-    update: {},
-    create: { id: "default" },
+  const existingSettings = await prisma.settings.findUnique({
+    where: { userId: demoUser.id },
   });
+
+  if (!existingSettings) {
+    await prisma.settings.create({
+      data: {
+        userId: demoUser.id,
+      },
+    });
+  }
 
   console.log("✓ Ensured default settings exist");
 }
