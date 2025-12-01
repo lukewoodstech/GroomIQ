@@ -31,6 +31,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import {
   createAppointment,
   updateAppointment,
   updateAppointmentStatus,
@@ -51,6 +58,11 @@ import {
   Clock,
   Phone,
   Mail,
+  Filter,
+  X,
+  MapPin,
+  User,
+  AlertCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format, addDays, subDays, isSameDay, startOfWeek, addWeeks, subWeeks } from "date-fns";
@@ -73,10 +85,10 @@ type Appointment = {
   pet: Pet;
 };
 
-// Calendar hours from 7 AM to 9 PM
+// Calendar configuration
 const CALENDAR_START_HOUR = 7;
 const CALENDAR_END_HOUR = 21;
-const HOUR_HEIGHT = 80; // pixels per hour
+const HOUR_HEIGHT = 72; // Reduced for better density
 
 type Service = {
   id: string;
@@ -99,6 +111,9 @@ export function CalendarPageContent({
   const [viewMode, setViewMode] = useState<"day" | "week">("day");
   const [quickAddTime, setQuickAddTime] = useState<{ date: Date; hour: number } | null>(null);
   const [draggedAppointment, setDraggedAppointment] = useState<Appointment | null>(null);
+  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
+  const [statusFilter, setStatusFilter] = useState<string | null>(null);
+  const [serviceFilter, setServiceFilter] = useState<string | null>(null);
 
   // Update current time every minute
   useEffect(() => {
@@ -112,11 +127,14 @@ export function CalendarPageContent({
   const weekStart = startOfWeek(selectedDate, { weekStartsOn: 0 });
   const weekDates = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
-  // Filter appointments for a specific date (no search filter here)
+  // Filter appointments for a specific date with filters
   const getAppointmentsForDate = (date: Date) => {
     return appointments.filter((apt) => {
       const aptDate = new Date(apt.date);
-      return isSameDay(aptDate, date);
+      const dateMatch = isSameDay(aptDate, date);
+      const statusMatch = !statusFilter || apt.status === statusFilter;
+      const serviceMatch = !serviceFilter || apt.service === serviceFilter;
+      return dateMatch && statusMatch && serviceMatch;
     });
   };
 
@@ -194,133 +212,232 @@ export function CalendarPageContent({
     setDraggedAppointment(null);
   };
 
-  // Calculate current time indicator position
-  const now = currentTime;
-  const currentHour = now.getHours();
-  const currentMinute = now.getMinutes();
+  const hasActiveFilters = statusFilter || serviceFilter;
 
   return (
-    <main className="flex flex-1 flex-col overflow-hidden bg-gray-50">
-      {/* Header */}
-      <header className="border-b bg-white">
-        <div className="flex h-16 items-center justify-between px-6">
-          {/* Search */}
-          <div className="relative w-full max-w-md">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+    <div className="flex flex-1 overflow-hidden bg-white">
+      {/* Left Sidebar - Filters */}
+      <aside className="w-64 border-r border-gray-200 bg-gray-50/50 flex flex-col">
+        {/* Sidebar Header */}
+        <div className="px-4 py-6 border-b border-gray-200">
+          <h2 className="text-sm font-semibold text-gray-900 mb-1">Calendar</h2>
+          <p className="text-xs text-gray-500">Manage your schedule</p>
+        </div>
+
+        {/* Search */}
+        <div className="px-4 py-4 border-b border-gray-200">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
             <Input
               type="search"
-              placeholder="Search..."
-              className="pl-9 w-full bg-gray-50 border-gray-200"
+              placeholder="Search appointments..."
+              className="pl-9 h-9 text-sm bg-white border-gray-300 focus:border-gray-400 focus:ring-0"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
+        </div>
 
-          {/* Right side - Date/Time display */}
-          <div className="flex items-center gap-4 text-sm text-muted-foreground">
-            {format(currentTime, "MMM d, h:mm a")}
+        {/* Filters */}
+        <div className="flex-1 overflow-y-auto px-4 py-4">
+          <div className="space-y-6">
+            {/* Status Filter */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <label className="text-xs font-semibold text-gray-700 uppercase tracking-wide">
+                  Status
+                </label>
+                {statusFilter && (
+                  <button
+                    onClick={() => setStatusFilter(null)}
+                    className="text-xs text-gray-500 hover:text-gray-700"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+              <div className="space-y-1">
+                <FilterButton
+                  active={statusFilter === "scheduled"}
+                  onClick={() => setStatusFilter(statusFilter === "scheduled" ? null : "scheduled")}
+                  icon={<Clock className="h-3.5 w-3.5" />}
+                  label="Scheduled"
+                  color="blue"
+                />
+                <FilterButton
+                  active={statusFilter === "completed"}
+                  onClick={() => setStatusFilter(statusFilter === "completed" ? null : "completed")}
+                  icon={<CheckCircle className="h-3.5 w-3.5" />}
+                  label="Completed"
+                  color="green"
+                />
+                <FilterButton
+                  active={statusFilter === "cancelled"}
+                  onClick={() => setStatusFilter(statusFilter === "cancelled" ? null : "cancelled")}
+                  icon={<XCircle className="h-3.5 w-3.5" />}
+                  label="Cancelled"
+                  color="red"
+                />
+              </div>
+            </div>
+
+            {/* Service Filter */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <label className="text-xs font-semibold text-gray-700 uppercase tracking-wide">
+                  Service Type
+                </label>
+                {serviceFilter && (
+                  <button
+                    onClick={() => setServiceFilter(null)}
+                    className="text-xs text-gray-500 hover:text-gray-700"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+              <div className="space-y-1">
+                {services.map((service) => (
+                  <FilterButton
+                    key={service.id}
+                    active={serviceFilter === service.name}
+                    onClick={() =>
+                      setServiceFilter(serviceFilter === service.name ? null : service.name)
+                    }
+                    icon={<Scissors className="h-3.5 w-3.5" />}
+                    label={service.name}
+                  />
+                ))}
+              </div>
+            </div>
           </div>
         </div>
-      </header>
 
-      {/* Calendar Controls */}
-      <div className="border-b bg-white px-6 py-3">
-        <div className="flex items-center justify-between">
-          {/* Date Navigation */}
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={goToToday}
-              className="font-medium"
-            >
-              Today
-            </Button>
-            <Button variant="ghost" size="icon" onClick={goToPrev}>
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <span className="font-medium min-w-[200px] text-center">
-              {viewMode === "day"
-                ? format(selectedDate, "MMM d, EEE, yyyy")
-                : `${format(weekStart, "MMM d")} - ${format(addDays(weekStart, 6), "MMM d, yyyy")}`}
-            </span>
-            <Button variant="ghost" size="icon" onClick={goToNext}>
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-
-          {/* Filters and Add Button */}
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" className="gap-2">
-              <Scissors className="h-4 w-4" />
-              Grooming
-            </Button>
-            <Button
-              variant={viewMode === "day" ? "default" : "outline"}
-              size="sm"
-              className="gap-2"
-              onClick={() => setViewMode("day")}
-            >
-              <CalendarIcon className="h-4 w-4" />
-              Day
-            </Button>
-            <Button
-              variant={viewMode === "week" ? "default" : "outline"}
-              size="sm"
-              className="gap-2"
-              onClick={() => setViewMode("week")}
-            >
-              <CalendarIcon className="h-4 w-4" />
-              Week
-            </Button>
-            <AddAppointmentDialog pets={pets} services={services} selectedDate={selectedDate} />
-          </div>
+        {/* Sidebar Footer */}
+        <div className="px-4 py-4 border-t border-gray-200">
+          <AddAppointmentDialog pets={pets} services={services} selectedDate={selectedDate} />
         </div>
-      </div>
+      </aside>
 
-      {/* Calendar Grid or Search Results */}
-      <div className="flex-1 overflow-auto">
-        {searchTerm ? (
-          <SearchResultsView
-            results={searchResults}
-            pets={pets}
-            searchTerm={searchTerm}
-            onSelectDate={(date) => {
-              setSelectedDate(date);
-              setSearchTerm("");
-            }}
-          />
-        ) : viewMode === "day" ? (
-          <DayView
-            date={selectedDate}
-            appointments={getAppointmentsForDate(selectedDate)}
-            pets={pets}
-            services={services}
-            timeSlots={timeSlots}
-            currentTime={currentTime}
-            onTimeSlotClick={handleTimeSlotClick}
-            onDragStart={handleDragStart}
-            onDrop={handleDrop}
-            draggedAppointment={draggedAppointment}
-          />
-        ) : (
-          <WeekView
-            weekDates={weekDates}
-            getAppointmentsForDate={getAppointmentsForDate}
-            pets={pets}
-            timeSlots={timeSlots}
-            currentTime={currentTime}
-            onTimeSlotClick={handleTimeSlotClick}
-            onDragStart={handleDragStart}
-            onDrop={handleDrop}
-            draggedAppointment={draggedAppointment}
-            onSelectDate={(date) => {
-              setSelectedDate(date);
-              setViewMode("day");
-            }}
-          />
-        )}
-      </div>
+      {/* Main Calendar Area */}
+      <main className="flex-1 flex flex-col overflow-hidden">
+        {/* Calendar Header */}
+        <header className="border-b border-gray-200 bg-white">
+          <div className="px-8 py-5">
+            <div className="flex items-center justify-between">
+              {/* Date Navigation */}
+              <div className="flex items-center gap-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={goToToday}
+                  className="h-9 px-4 text-sm font-medium border-gray-300 hover:border-gray-400 hover:bg-gray-50"
+                >
+                  Today
+                </Button>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={goToPrev}
+                    className="h-9 w-9 hover:bg-gray-100"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <div className="min-w-[280px] text-center">
+                    <h1 className="text-lg font-semibold text-gray-900">
+                      {viewMode === "day"
+                        ? format(selectedDate, "EEEE, MMMM d, yyyy")
+                        : `${format(weekStart, "MMM d")} - ${format(addDays(weekStart, 6), "MMM d, yyyy")}`}
+                    </h1>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={goToNext}
+                    className="h-9 w-9 hover:bg-gray-100"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+
+              {/* View Controls */}
+              <div className="flex items-center gap-2">
+                <div className="inline-flex rounded-lg border border-gray-300 p-0.5 bg-gray-50">
+                  <button
+                    onClick={() => setViewMode("day")}
+                    className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
+                      viewMode === "day"
+                        ? "bg-white text-gray-900 shadow-sm"
+                        : "text-gray-600 hover:text-gray-900"
+                    }`}
+                  >
+                    Day
+                  </button>
+                  <button
+                    onClick={() => setViewMode("week")}
+                    className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
+                      viewMode === "week"
+                        ? "bg-white text-gray-900 shadow-sm"
+                        : "text-gray-600 hover:text-gray-900"
+                    }`}
+                  >
+                    Week
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        {/* Calendar Grid or Search Results */}
+        <div className="flex-1 overflow-auto bg-white">
+          {searchTerm ? (
+            <SearchResultsView
+              results={searchResults}
+              pets={pets}
+              searchTerm={searchTerm}
+              onSelectDate={(date) => {
+                setSelectedDate(date);
+                setSearchTerm("");
+              }}
+              onSelectAppointment={setSelectedAppointment}
+            />
+          ) : viewMode === "day" ? (
+            <DayView
+              date={selectedDate}
+              appointments={getAppointmentsForDate(selectedDate)}
+              pets={pets}
+              services={services}
+              timeSlots={timeSlots}
+              currentTime={currentTime}
+              onTimeSlotClick={handleTimeSlotClick}
+              onDragStart={handleDragStart}
+              onDrop={handleDrop}
+              draggedAppointment={draggedAppointment}
+              onSelectAppointment={setSelectedAppointment}
+            />
+          ) : (
+            <WeekView
+              weekDates={weekDates}
+              getAppointmentsForDate={getAppointmentsForDate}
+              pets={pets}
+              timeSlots={timeSlots}
+              currentTime={currentTime}
+              onTimeSlotClick={handleTimeSlotClick}
+              onDragStart={handleDragStart}
+              onDrop={handleDrop}
+              draggedAppointment={draggedAppointment}
+              onSelectDate={(date) => {
+                setSelectedDate(date);
+                setViewMode("day");
+              }}
+              onSelectAppointment={setSelectedAppointment}
+            />
+          )}
+        </div>
+      </main>
 
       {/* Quick Add Dialog */}
       {quickAddTime && (
@@ -332,7 +449,52 @@ export function CalendarPageContent({
           onClose={() => setQuickAddTime(null)}
         />
       )}
-    </main>
+
+      {/* Event Details Drawer */}
+      {selectedAppointment && (
+        <EventDetailsDrawer
+          appointment={selectedAppointment}
+          pets={pets}
+          services={services}
+          onClose={() => setSelectedAppointment(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+function FilterButton({
+  active,
+  onClick,
+  icon,
+  label,
+  color,
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon: React.ReactNode;
+  label: string;
+  color?: "blue" | "green" | "red";
+}) {
+  const colorClasses = {
+    blue: active ? "bg-blue-50 text-blue-700 border-blue-200" : "",
+    green: active ? "bg-green-50 text-green-700 border-green-200" : "",
+    red: active ? "bg-red-50 text-red-700 border-red-200" : "",
+  };
+
+  return (
+    <button
+      onClick={onClick}
+      className={`w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg border transition-all ${
+        active
+          ? `${colorClasses[color || "blue"]} font-medium`
+          : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300"
+      }`}
+    >
+      <span className={active ? "" : "text-gray-400"}>{icon}</span>
+      <span className="flex-1 text-left">{label}</span>
+      {active && <CheckCircle className="h-3.5 w-3.5" />}
+    </button>
   );
 }
 
@@ -347,6 +509,7 @@ function DayView({
   onDragStart,
   onDrop,
   draggedAppointment,
+  onSelectAppointment,
 }: {
   date: Date;
   appointments: Appointment[];
@@ -358,6 +521,7 @@ function DayView({
   onDragStart: (apt: Appointment) => void;
   onDrop: (date: Date, hour: number) => void;
   draggedAppointment: Appointment | null;
+  onSelectAppointment: (apt: Appointment) => void;
 }) {
   const isToday = isSameDay(date, currentTime);
   const currentHour = currentTime.getHours();
@@ -375,41 +539,50 @@ function DayView({
     <div className="relative min-h-full">
       {/* Time slots */}
       <div className="relative">
-        {timeSlots.map((hour) => (
+        {timeSlots.map((hour, index) => (
           <div
             key={hour}
-            className="flex border-b border-gray-200"
+            className={`flex border-b ${
+              index % 2 === 0 ? "bg-white" : "bg-gray-50/30"
+            } ${index === 0 ? "border-t border-gray-200" : "border-gray-200"}`}
             style={{ height: `${HOUR_HEIGHT}px` }}
           >
             {/* Time label */}
-            <div className="w-20 flex-shrink-0 pr-3 pt-0 text-right text-xs text-muted-foreground -mt-2">
-              {hour === 12
-                ? "12 PM"
-                : hour > 12
-                ? `${hour - 12} PM`
-                : `${hour} AM`}
+            <div className="w-20 flex-shrink-0 px-4 pt-2 text-right">
+              <span className="text-xs font-medium text-gray-500">
+                {hour === 12
+                  ? "12 PM"
+                  : hour > 12
+                  ? `${hour - 12} PM`
+                  : hour === 0
+                  ? "12 AM"
+                  : `${hour} AM`}
+              </span>
             </div>
             {/* Slot area - clickable */}
             <div
-              className={`flex-1 border-l border-gray-200 bg-white cursor-pointer hover:bg-gray-50 transition-colors ${
-                draggedAppointment ? "hover:bg-blue-50" : ""
+              className={`flex-1 border-l border-gray-200 cursor-pointer transition-colors relative ${
+                draggedAppointment
+                  ? "hover:bg-blue-50/50"
+                  : "hover:bg-gray-100/50"
               }`}
               onClick={() => onTimeSlotClick(date, hour)}
               onDragOver={(e) => e.preventDefault()}
               onDrop={() => onDrop(date, hour)}
-            />
+            >
+              {/* 30-minute divider */}
+              <div className="absolute top-1/2 left-0 right-0 border-t border-gray-100" />
+            </div>
           </div>
         ))}
 
         {/* Current time indicator */}
         {showTimeIndicator && (
           <div
-            className="absolute left-16 right-0 flex items-center z-20 pointer-events-none"
+            className="absolute left-16 right-0 flex items-center z-30 pointer-events-none"
             style={{ top: `${timeIndicatorTop}px` }}
           >
-            <div className="bg-red-500 text-white text-xs px-1.5 py-0.5 rounded font-medium">
-              {format(currentTime, "h:mm")}
-            </div>
+            <div className="w-2 h-2 rounded-full bg-red-500 -ml-1" />
             <div className="flex-1 h-0.5 bg-red-500" />
           </div>
         )}
@@ -422,6 +595,7 @@ function DayView({
             pets={pets}
             services={services}
             onDragStart={onDragStart}
+            onClick={onSelectAppointment}
           />
         ))}
       </div>
@@ -434,18 +608,23 @@ function SearchResultsView({
   pets,
   searchTerm,
   onSelectDate,
+  onSelectAppointment,
 }: {
   results: Appointment[];
   pets: Pet[];
   searchTerm: string;
   onSelectDate: (date: Date) => void;
+  onSelectAppointment: (apt: Appointment) => void;
 }) {
   if (results.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 text-center">
-        <Search className="h-12 w-12 text-muted-foreground mb-4" />
-        <p className="text-muted-foreground">
-          No appointments found for "{searchTerm}"
+      <div className="flex flex-col items-center justify-center py-16 text-center">
+        <div className="rounded-full bg-gray-100 p-4 mb-4">
+          <Search className="h-8 w-8 text-gray-400" />
+        </div>
+        <p className="text-sm font-medium text-gray-900 mb-1">No appointments found</p>
+        <p className="text-sm text-gray-500">
+          No results for "{searchTerm}"
         </p>
       </div>
     );
@@ -462,74 +641,60 @@ function SearchResultsView({
   }, {} as Record<string, Appointment[]>);
 
   return (
-    <div className="p-6">
-      <p className="text-sm text-muted-foreground mb-4">
-        Found {results.length} appointment{results.length !== 1 ? "s" : ""} matching "{searchTerm}"
-      </p>
-      <div className="space-y-6">
+    <div className="p-8">
+      <div className="mb-6">
+        <p className="text-sm text-gray-600">
+          Found <span className="font-semibold text-gray-900">{results.length}</span> appointment
+          {results.length !== 1 ? "s" : ""} matching "{searchTerm}"
+        </p>
+      </div>
+      <div className="space-y-8">
         {Object.entries(groupedResults).map(([dateKey, dayAppointments]) => (
           <div key={dateKey}>
-            <h3
-              className="text-sm font-medium text-muted-foreground mb-3 cursor-pointer hover:text-foreground"
+            <button
               onClick={() => onSelectDate(new Date(dateKey))}
+              className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-4 hover:text-gray-700 transition-colors"
             >
               {format(new Date(dateKey), "EEEE, MMMM d, yyyy")}
-            </h3>
+            </button>
             <div className="space-y-2">
               {dayAppointments.map((apt) => {
                 const aptDate = new Date(apt.date);
                 const endDate = new Date(aptDate.getTime() + apt.duration * 60000);
 
                 return (
-                  <div
+                  <button
                     key={apt.id}
-                    className="rounded-lg border p-4 bg-white hover:shadow-md transition-shadow cursor-pointer"
-                    onClick={() => onSelectDate(new Date(apt.date))}
+                    onClick={() => onSelectAppointment(apt)}
+                    className="w-full rounded-xl border border-gray-200 p-4 bg-white hover:shadow-md hover:border-gray-300 transition-all text-left"
                   >
                     <div className="flex justify-between items-start">
-                      <div>
-                        <h4 className="font-semibold">{apt.pet.name}</h4>
-                        <p className="text-sm text-muted-foreground">
-                          {apt.pet.client.firstName} {apt.pet.client.lastName}
-                        </p>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          {format(aptDate, "h:mm a")} - {format(endDate, "h:mm a")}
-                          {apt.service && ` • ${apt.service}`}
-                        </p>
+                      <div className="flex items-start gap-4">
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-semibold text-sm flex-shrink-0">
+                          {apt.pet.name.substring(0, 2).toUpperCase()}
+                        </div>
+                        <div>
+                          <h4 className="font-semibold text-gray-900">{apt.pet.name}</h4>
+                          <p className="text-sm text-gray-600">
+                            {apt.pet.client.firstName} {apt.pet.client.lastName}
+                          </p>
+                          <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
+                            <span className="flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              {format(aptDate, "h:mm a")} - {format(endDate, "h:mm a")}
+                            </span>
+                            {apt.service && (
+                              <span className="flex items-center gap-1">
+                                <Scissors className="h-3 w-3" />
+                                {apt.service}
+                              </span>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span
-                          className={`px-2 py-1 rounded text-xs font-medium ${
-                            apt.status === "completed"
-                              ? "bg-green-100 text-green-800"
-                              : apt.status === "cancelled"
-                              ? "bg-red-100 text-red-800"
-                              : "bg-blue-100 text-blue-800"
-                          }`}
-                        >
-                          {apt.status}
-                        </span>
-                        {apt.pet.client.phone && (
-                          <a
-                            href={`tel:${apt.pet.client.phone}`}
-                            className="p-1 hover:bg-gray-100 rounded"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <Phone className="h-4 w-4 text-muted-foreground" />
-                          </a>
-                        )}
-                        {apt.pet.client.email && (
-                          <a
-                            href={`mailto:${apt.pet.client.email}`}
-                            className="p-1 hover:bg-gray-100 rounded"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <Mail className="h-4 w-4 text-muted-foreground" />
-                          </a>
-                        )}
-                      </div>
+                      <StatusBadge status={apt.status} />
                     </div>
-                  </div>
+                  </button>
                 );
               })}
             </div>
@@ -551,6 +716,7 @@ function WeekView({
   onDrop,
   draggedAppointment,
   onSelectDate,
+  onSelectAppointment,
 }: {
   weekDates: Date[];
   getAppointmentsForDate: (date: Date) => Appointment[];
@@ -562,6 +728,7 @@ function WeekView({
   onDrop: (date: Date, hour: number) => void;
   draggedAppointment: Appointment | null;
   onSelectDate: (date: Date) => void;
+  onSelectAppointment: (apt: Appointment) => void;
 }) {
   const currentHour = currentTime.getHours();
   const currentMinute = currentTime.getMinutes();
@@ -569,56 +736,67 @@ function WeekView({
   return (
     <div className="flex flex-col min-h-full">
       {/* Day headers */}
-      <div className="flex border-b bg-white sticky top-0 z-10">
-        <div className="w-20 flex-shrink-0" />
+      <div className="flex border-b border-gray-200 bg-white sticky top-0 z-10">
+        <div className="w-20 flex-shrink-0 border-r border-gray-200" />
         {weekDates.map((date) => {
           const isToday = isSameDay(date, currentTime);
           return (
-            <div
+            <button
               key={date.toISOString()}
-              className={`flex-1 text-center py-3 border-l cursor-pointer hover:bg-gray-50 ${
-                isToday ? "bg-blue-50" : ""
-              }`}
               onClick={() => onSelectDate(date)}
+              className={`flex-1 text-center py-4 border-l border-gray-200 transition-colors ${
+                isToday ? "bg-blue-50/50" : "hover:bg-gray-50"
+              }`}
             >
-              <div className="text-xs text-muted-foreground">
+              <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
                 {format(date, "EEE")}
               </div>
-              <div className={`text-lg font-semibold ${isToday ? "text-blue-600" : ""}`}>
+              <div
+                className={`text-xl font-semibold ${
+                  isToday ? "text-blue-600" : "text-gray-900"
+                }`}
+              >
                 {format(date, "d")}
               </div>
-            </div>
+            </button>
           );
         })}
       </div>
 
       {/* Time grid */}
       <div className="relative flex-1">
-        {timeSlots.map((hour) => (
+        {timeSlots.map((hour, index) => (
           <div
             key={hour}
-            className="flex border-b border-gray-200"
+            className={`flex border-b ${
+              index % 2 === 0 ? "bg-white" : "bg-gray-50/30"
+            } border-gray-200`}
             style={{ height: `${HOUR_HEIGHT}px` }}
           >
             {/* Time label */}
-            <div className="w-20 flex-shrink-0 pr-3 pt-0 text-right text-xs text-muted-foreground -mt-2">
-              {hour === 12
-                ? "12 PM"
-                : hour > 12
-                ? `${hour - 12} PM`
-                : `${hour} AM`}
+            <div className="w-20 flex-shrink-0 px-4 pt-2 text-right border-r border-gray-200">
+              <span className="text-xs font-medium text-gray-500">
+                {hour === 12
+                  ? "12 PM"
+                  : hour > 12
+                  ? `${hour - 12} PM`
+                  : `${hour} AM`}
+              </span>
             </div>
             {/* Day columns */}
             {weekDates.map((date) => (
               <div
                 key={date.toISOString()}
-                className={`flex-1 border-l border-gray-200 bg-white cursor-pointer hover:bg-gray-50 transition-colors ${
-                  draggedAppointment ? "hover:bg-blue-50" : ""
+                className={`flex-1 border-l border-gray-200 cursor-pointer transition-colors relative ${
+                  draggedAppointment ? "hover:bg-blue-50/50" : "hover:bg-gray-100/50"
                 }`}
                 onClick={() => onTimeSlotClick(date, hour)}
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={() => onDrop(date, hour)}
-              />
+              >
+                {/* 30-minute divider */}
+                <div className="absolute top-1/2 left-0 right-0 border-t border-gray-100" />
+              </div>
             ))}
           </div>
         ))}
@@ -637,14 +815,16 @@ function WeekView({
           return (
             <div
               key={`indicator-${date.toISOString()}`}
-              className="absolute h-0.5 bg-red-500 z-20 pointer-events-none"
+              className="absolute flex items-center z-30 pointer-events-none"
               style={{
                 top: `${timeIndicatorTop}px`,
-                left: `calc(5rem + ${(dayIndex / 7) * 100}% * (7/7))`,
-                width: `calc(100% / 7)`,
-                marginLeft: `calc(${dayIndex} * (100% - 5rem) / 7)`,
+                left: `calc(5rem + ${(dayIndex / 7) * 100}%)`,
+                width: `calc((100% - 5rem) / 7)`,
               }}
-            />
+            >
+              <div className="w-1.5 h-1.5 rounded-full bg-red-500" />
+              <div className="flex-1 h-0.5 bg-red-500" />
+            </div>
           );
         })}
 
@@ -659,6 +839,7 @@ function WeekView({
               dayIndex={dayIndex}
               totalDays={7}
               onDragStart={onDragStart}
+              onClick={onSelectAppointment}
             />
           ));
         })}
@@ -672,11 +853,13 @@ function AppointmentBlock({
   pets,
   services,
   onDragStart,
+  onClick,
 }: {
   appointment: Appointment;
   pets: Pet[];
   services: Service[];
   onDragStart: (apt: Appointment) => void;
+  onClick: (apt: Appointment) => void;
 }) {
   const aptDate = new Date(appointment.date);
   const startHour = aptDate.getHours();
@@ -692,81 +875,74 @@ function AppointmentBlock({
   // Calculate end time
   const endDate = new Date(aptDate.getTime() + appointment.duration * 60000);
 
-  // Color based on status
-  const bgColor =
-    appointment.status === "completed"
-      ? "bg-gray-100 border-gray-300"
-      : appointment.status === "cancelled"
-      ? "bg-red-50 border-red-200"
-      : "bg-emerald-50 border-emerald-200";
+  // Status-based styling with better contrast
+  const statusStyles = {
+    scheduled: {
+      bg: "bg-blue-50",
+      border: "border-l-blue-500",
+      text: "text-blue-900",
+      badge: "bg-blue-100 text-blue-700",
+    },
+    completed: {
+      bg: "bg-green-50",
+      border: "border-l-green-500",
+      text: "text-green-900",
+      badge: "bg-green-100 text-green-700",
+    },
+    cancelled: {
+      bg: "bg-red-50",
+      border: "border-l-red-500",
+      text: "text-red-900",
+      badge: "bg-red-100 text-red-700",
+    },
+  };
 
-  const borderColor =
-    appointment.status === "cancelled"
-      ? "#ef4444"
-      : appointment.status === "completed"
-      ? "#9ca3af"
-      : "#10b981";
+  const style = statusStyles[appointment.status as keyof typeof statusStyles] || statusStyles.scheduled;
 
   return (
     <div
       draggable
       onDragStart={() => onDragStart(appointment)}
-      className={`absolute left-20 right-4 rounded-lg border-l-4 ${bgColor} p-3 shadow-sm cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow z-10`}
+      onClick={() => onClick(appointment)}
+      className={`absolute left-20 right-6 ${style.bg} ${style.border} border-l-4 border-r border-t border-b border-gray-200 rounded-lg p-3 shadow-sm cursor-pointer hover:shadow-lg transition-all z-10 group`}
       style={{
         top: `${top}px`,
-        height: `${height}px`,
-        minHeight: "60px",
-        borderLeftColor: borderColor,
+        height: `${Math.max(height, 64)}px`,
       }}
     >
-      <div className="flex justify-between items-start h-full">
-        <div className="overflow-hidden flex-1">
-          <h3 className="font-semibold text-sm truncate">{appointment.pet.name}</h3>
-          <p className="text-xs text-muted-foreground truncate">
-            {appointment.pet.client.firstName} {appointment.pet.client.lastName}
-          </p>
-          <p className="text-xs text-muted-foreground mt-1">
-            {format(aptDate, "h:mm a")} - {format(endDate, "h:mm a")}
-          </p>
-          {appointment.service && (
-            <p className="text-xs font-medium mt-1">{appointment.service}</p>
-          )}
+      <div className="flex gap-3 h-full">
+        {/* Pet Avatar */}
+        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-semibold text-xs flex-shrink-0">
+          {appointment.pet.name.substring(0, 2).toUpperCase()}
         </div>
-        <div className="flex items-center gap-1">
-          {/* Quick Actions */}
-          {appointment.pet.client.phone && (
-            <a
-              href={`tel:${appointment.pet.client.phone}`}
-              className="p-1 hover:bg-black/5 rounded"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <Phone className="h-3 w-3 text-muted-foreground" />
-            </a>
+
+        {/* Content */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex-1 min-w-0">
+              <h3 className={`font-semibold text-sm ${style.text} truncate`}>
+                {appointment.pet.name}
+              </h3>
+              <p className="text-xs text-gray-600 truncate">
+                {appointment.pet.client.firstName} {appointment.pet.client.lastName}
+              </p>
+            </div>
+            <StatusBadge status={appointment.status} size="sm" />
+          </div>
+
+          <div className="mt-2 flex items-center gap-1 text-xs text-gray-600">
+            <Clock className="h-3 w-3" />
+            <span>{format(aptDate, "h:mm a")}</span>
+            <span className="text-gray-400">-</span>
+            <span>{format(endDate, "h:mm a")}</span>
+          </div>
+
+          {appointment.service && height > 80 && (
+            <div className="mt-2 flex items-center gap-1 text-xs font-medium text-gray-700">
+              <Scissors className="h-3 w-3" />
+              <span className="truncate">{appointment.service}</span>
+            </div>
           )}
-          {appointment.pet.client.email && (
-            <a
-              href={`mailto:${appointment.pet.client.email}`}
-              className="p-1 hover:bg-black/5 rounded"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <Mail className="h-3 w-3 text-muted-foreground" />
-            </a>
-          )}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-6 w-6">
-                <MoreVertical className="h-3 w-3" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <StatusMenuItem appointment={appointment} status="scheduled" />
-              <StatusMenuItem appointment={appointment} status="completed" />
-              <StatusMenuItem appointment={appointment} status="cancelled" />
-              <DropdownMenuSeparator />
-              <EditAppointmentDialog appointment={appointment} pets={pets} services={services} />
-              <DeleteAppointmentDialog appointment={appointment} />
-            </DropdownMenuContent>
-          </DropdownMenu>
         </div>
       </div>
     </div>
@@ -779,12 +955,14 @@ function WeekAppointmentBlock({
   dayIndex,
   totalDays,
   onDragStart,
+  onClick,
 }: {
   appointment: Appointment;
   pets: Pet[];
   dayIndex: number;
   totalDays: number;
   onDragStart: (apt: Appointment) => void;
+  onClick: (apt: Appointment) => void;
 }) {
   const aptDate = new Date(appointment.date);
   const startHour = aptDate.getHours();
@@ -797,50 +975,217 @@ function WeekAppointmentBlock({
     (startMinute / 60) * HOUR_HEIGHT;
   const height = durationHours * HOUR_HEIGHT;
 
-  // Color based on status
-  const bgColor =
-    appointment.status === "completed"
-      ? "bg-gray-50 border-gray-300"
-      : appointment.status === "cancelled"
-      ? "bg-red-50 border-red-300"
-      : "bg-emerald-50 border-emerald-400";
+  // Status-based styling
+  const statusStyles = {
+    scheduled: "bg-blue-500 text-white",
+    completed: "bg-green-500 text-white",
+    cancelled: "bg-red-500 text-white",
+  };
 
-  const endDate = new Date(aptDate.getTime() + appointment.duration * 60000);
-  const tooltipText = `${appointment.pet.name} (${appointment.pet.client.firstName} ${appointment.pet.client.lastName})\n${format(aptDate, "h:mm a")} - ${format(endDate, "h:mm a")}${appointment.service ? `\n${appointment.service}` : ""}`;
+  const style = statusStyles[appointment.status as keyof typeof statusStyles] || statusStyles.scheduled;
 
   return (
     <div
       draggable
       onDragStart={() => onDragStart(appointment)}
-      title={tooltipText}
-      className={`absolute ${bgColor} rounded border-l-2 p-1.5 text-xs cursor-grab active:cursor-grabbing hover:shadow-md hover:z-20 transition-shadow z-10 overflow-hidden`}
+      onClick={() => onClick(appointment)}
+      className={`absolute ${style} rounded-md px-2 py-1.5 text-xs font-medium cursor-pointer hover:shadow-lg hover:z-20 transition-all z-10 overflow-hidden`}
       style={{
         top: `${top}px`,
-        height: `${Math.max(height, 36)}px`,
+        height: `${Math.max(height, 40)}px`,
         left: `calc(5rem + ${dayIndex} * (100% - 5rem) / ${totalDays} + 2px)`,
         width: `calc((100% - 5rem) / ${totalDays} - 4px)`,
       }}
     >
       <div className="font-semibold truncate leading-tight">{appointment.pet.name}</div>
-      <div className="text-muted-foreground truncate leading-tight">
-        {format(aptDate, "h:mma").toLowerCase()}
+      <div className="opacity-90 truncate leading-tight text-xs">
+        {format(aptDate, "h:mm a")}
       </div>
-      {height > 50 && appointment.service && (
-        <div className="text-muted-foreground truncate leading-tight mt-0.5">
-          {appointment.service}
-        </div>
-      )}
     </div>
   );
 }
 
-function StatusMenuItem({
+function StatusBadge({ status, size = "default" }: { status: string; size?: "sm" | "default" }) {
+  const statusConfig = {
+    scheduled: {
+      label: "Scheduled",
+      icon: <Clock className={size === "sm" ? "h-2.5 w-2.5" : "h-3 w-3"} />,
+      className: "bg-blue-100 text-blue-700 border-blue-200",
+    },
+    completed: {
+      label: "Completed",
+      icon: <CheckCircle className={size === "sm" ? "h-2.5 w-2.5" : "h-3 w-3"} />,
+      className: "bg-green-100 text-green-700 border-green-200",
+    },
+    cancelled: {
+      label: "Cancelled",
+      icon: <XCircle className={size === "sm" ? "h-2.5 w-2.5" : "h-3 w-3"} />,
+      className: "bg-red-100 text-red-700 border-red-200",
+    },
+  };
+
+  const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.scheduled;
+  const sizeClasses = size === "sm" ? "px-2 py-0.5 text-xs" : "px-2.5 py-1 text-xs";
+
+  return (
+    <span
+      className={`inline-flex items-center gap-1 ${sizeClasses} rounded-full font-medium border ${config.className}`}
+    >
+      {config.icon}
+      <span>{config.label}</span>
+    </span>
+  );
+}
+
+function EventDetailsDrawer({
   appointment,
-  status,
+  pets,
+  services,
+  onClose,
 }: {
   appointment: Appointment;
-  status: string;
+  pets: Pet[];
+  services: Service[];
+  onClose: () => void;
 }) {
+  const aptDate = new Date(appointment.date);
+  const endDate = new Date(aptDate.getTime() + appointment.duration * 60000);
+
+  return (
+    <Sheet open={true} onOpenChange={onClose}>
+      <SheetContent className="w-[480px] sm:max-w-[480px] overflow-y-auto">
+        <SheetHeader className="pb-6 border-b">
+          <div className="flex items-start gap-4">
+            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-semibold text-lg flex-shrink-0">
+              {appointment.pet.name.substring(0, 2).toUpperCase()}
+            </div>
+            <div className="flex-1 min-w-0">
+              <SheetTitle className="text-xl font-semibold">{appointment.pet.name}</SheetTitle>
+              <SheetDescription className="text-sm text-gray-600 mt-1">
+                {appointment.pet.client.firstName} {appointment.pet.client.lastName}
+              </SheetDescription>
+            </div>
+          </div>
+          <div className="mt-4">
+            <StatusBadge status={appointment.status} />
+          </div>
+        </SheetHeader>
+
+        <div className="py-6 space-y-6">
+          {/* Date & Time */}
+          <div>
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+              Date & Time
+            </h3>
+            <div className="space-y-3">
+              <div className="flex items-center gap-3 text-sm">
+                <CalendarIcon className="h-4 w-4 text-gray-400" />
+                <span className="font-medium text-gray-900">
+                  {format(aptDate, "EEEE, MMMM d, yyyy")}
+                </span>
+              </div>
+              <div className="flex items-center gap-3 text-sm">
+                <Clock className="h-4 w-4 text-gray-400" />
+                <span className="text-gray-900">
+                  {format(aptDate, "h:mm a")} - {format(endDate, "h:mm a")}
+                </span>
+                <span className="text-gray-500">({appointment.duration} min)</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Service */}
+          {appointment.service && (
+            <div>
+              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+                Service
+              </h3>
+              <div className="flex items-center gap-3 text-sm">
+                <Scissors className="h-4 w-4 text-gray-400" />
+                <span className="font-medium text-gray-900">{appointment.service}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Client Contact */}
+          <div>
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+              Client Contact
+            </h3>
+            <div className="space-y-3">
+              <div className="flex items-center gap-3 text-sm">
+                <User className="h-4 w-4 text-gray-400" />
+                <span className="text-gray-900">
+                  {appointment.pet.client.firstName} {appointment.pet.client.lastName}
+                </span>
+              </div>
+              {appointment.pet.client.phone && (
+                <div className="flex items-center gap-3 text-sm">
+                  <Phone className="h-4 w-4 text-gray-400" />
+                  <a
+                    href={`tel:${appointment.pet.client.phone}`}
+                    className="text-blue-600 hover:text-blue-700 hover:underline"
+                  >
+                    {appointment.pet.client.phone}
+                  </a>
+                </div>
+              )}
+              {appointment.pet.client.email && (
+                <div className="flex items-center gap-3 text-sm">
+                  <Mail className="h-4 w-4 text-gray-400" />
+                  <a
+                    href={`mailto:${appointment.pet.client.email}`}
+                    className="text-blue-600 hover:text-blue-700 hover:underline truncate"
+                  >
+                    {appointment.pet.client.email}
+                  </a>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Notes */}
+          {appointment.notes && (
+            <div>
+              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+                Notes
+              </h3>
+              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                <p className="text-sm text-gray-700 whitespace-pre-wrap">{appointment.notes}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Actions */}
+          <div className="pt-4 space-y-2">
+            <EditAppointmentDialog appointment={appointment} pets={pets} services={services} />
+            <div className="flex gap-2">
+              <QuickStatusButton appointment={appointment} status="scheduled" />
+              <QuickStatusButton appointment={appointment} status="completed" />
+              <QuickStatusButton appointment={appointment} status="cancelled" />
+            </div>
+            <DeleteAppointmentDialog appointment={appointment} />
+          </div>
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+function QuickStatusButton({ appointment, status }: { appointment: Appointment; status: string }) {
+  if (appointment.status === status) return null;
+
+  const statusConfig = {
+    scheduled: { label: "Mark Scheduled", icon: Clock, color: "blue" },
+    completed: { label: "Mark Completed", icon: CheckCircle, color: "green" },
+    cancelled: { label: "Mark Cancelled", icon: XCircle, color: "red" },
+  };
+
+  const config = statusConfig[status as keyof typeof statusConfig];
+  if (!config) return null;
+
+  const Icon = config.icon;
+
   async function handleStatusChange() {
     try {
       await updateAppointmentStatus(appointment.id, status);
@@ -850,21 +1195,16 @@ function StatusMenuItem({
     }
   }
 
-  const icons = {
-    scheduled: <Clock className="h-4 w-4 mr-2" />,
-    completed: <CheckCircle className="h-4 w-4 mr-2" />,
-    cancelled: <XCircle className="h-4 w-4 mr-2" />,
-  };
-
-  if (appointment.status === status) {
-    return null;
-  }
-
   return (
-    <DropdownMenuItem onClick={handleStatusChange}>
-      {icons[status as keyof typeof icons]}
-      Mark as {status}
-    </DropdownMenuItem>
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={handleStatusChange}
+      className="flex-1 h-9 text-xs border-gray-300"
+    >
+      <Icon className="h-3.5 w-3.5 mr-1.5" />
+      {config.label.replace("Mark ", "")}
+    </Button>
   );
 }
 
@@ -910,16 +1250,16 @@ function QuickAddDialog({
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-[480px]">
         <DialogHeader>
-          <DialogTitle>Book Appointment</DialogTitle>
-          <DialogDescription>
+          <DialogTitle className="text-lg font-semibold">Book Appointment</DialogTitle>
+          <DialogDescription className="text-sm text-gray-600">
             {format(date, "EEEE, MMMM d")} at {hour > 12 ? hour - 12 : hour}:00 {hour >= 12 ? "PM" : "AM"}
           </DialogDescription>
         </DialogHeader>
-        <form action={handleSubmit} className="space-y-4">
+        <form action={handleSubmit} className="space-y-4 pt-4">
           <div className="space-y-2">
-            <Label>Pet *</Label>
+            <Label className="text-sm font-medium">Pet *</Label>
             <SearchableSelect
               options={petOptions}
               value={selectedPetId}
@@ -933,7 +1273,9 @@ function QuickAddDialog({
           <input type="hidden" name="time" value={timeString} />
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="quick-duration">Duration (minutes)</Label>
+              <Label htmlFor="quick-duration" className="text-sm font-medium">
+                Duration (min)
+              </Label>
               <Input
                 id="quick-duration"
                 name="duration"
@@ -941,10 +1283,13 @@ function QuickAddDialog({
                 defaultValue={60}
                 min="15"
                 step="15"
+                className="h-9"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="quick-service">Service</Label>
+              <Label htmlFor="quick-service" className="text-sm font-medium">
+                Service
+              </Label>
               <select
                 id="quick-service"
                 name="service"
@@ -960,19 +1305,23 @@ function QuickAddDialog({
             </div>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="quick-notes">Notes</Label>
+            <Label htmlFor="quick-notes" className="text-sm font-medium">
+              Notes
+            </Label>
             <textarea
               id="quick-notes"
               name="notes"
-              rows={2}
-              className="flex min-h-[60px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              rows={3}
+              className="flex min-h-[72px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none"
             />
           </div>
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={onClose}>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="outline" onClick={onClose} className="h-9">
               Cancel
             </Button>
-            <Button type="submit">Book</Button>
+            <Button type="submit" className="h-9 bg-blue-600 hover:bg-blue-700">
+              Book Appointment
+            </Button>
           </div>
         </form>
       </DialogContent>
@@ -1022,21 +1371,21 @@ function AddAppointmentDialog({
       if (!isOpen) setSelectedPetId("");
     }}>
       <DialogTrigger asChild>
-        <Button className="bg-red-500 hover:bg-red-600 text-white gap-2">
-          <Plus className="h-4 w-4" />
-          Add
+        <Button className="w-full h-10 bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-sm">
+          <Plus className="h-4 w-4 mr-2" />
+          New Appointment
         </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="sm:max-w-[480px]">
         <DialogHeader>
-          <DialogTitle>Book New Appointment</DialogTitle>
-          <DialogDescription>
+          <DialogTitle className="text-lg font-semibold">Book New Appointment</DialogTitle>
+          <DialogDescription className="text-sm text-gray-600">
             Schedule an appointment for a pet.
           </DialogDescription>
         </DialogHeader>
-        <form action={handleSubmit} className="space-y-4">
+        <form action={handleSubmit} className="space-y-4 pt-4">
           <div className="space-y-2">
-            <Label>Pet *</Label>
+            <Label className="text-sm font-medium">Pet *</Label>
             <SearchableSelect
               options={petOptions}
               value={selectedPetId}
@@ -1048,23 +1397,30 @@ function AddAppointmentDialog({
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="date">Date *</Label>
+              <Label htmlFor="date" className="text-sm font-medium">
+                Date *
+              </Label>
               <Input
                 id="date"
                 name="date"
                 type="date"
                 defaultValue={format(selectedDate, "yyyy-MM-dd")}
                 required
+                className="h-9"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="time">Time *</Label>
-              <Input id="time" name="time" type="time" required />
+              <Label htmlFor="time" className="text-sm font-medium">
+                Time *
+              </Label>
+              <Input id="time" name="time" type="time" required className="h-9" />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="duration">Duration (minutes)</Label>
+              <Label htmlFor="duration" className="text-sm font-medium">
+                Duration (min)
+              </Label>
               <Input
                 id="duration"
                 name="duration"
@@ -1072,10 +1428,13 @@ function AddAppointmentDialog({
                 defaultValue={60}
                 min="15"
                 step="15"
+                className="h-9"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="service">Service</Label>
+              <Label htmlFor="service" className="text-sm font-medium">
+                Service
+              </Label>
               <select
                 id="service"
                 name="service"
@@ -1091,23 +1450,28 @@ function AddAppointmentDialog({
             </div>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="notes">Notes</Label>
+            <Label htmlFor="notes" className="text-sm font-medium">
+              Notes
+            </Label>
             <textarea
               id="notes"
               name="notes"
               rows={3}
-              className="flex min-h-[60px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex min-h-[72px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none disabled:cursor-not-allowed disabled:opacity-50"
             />
           </div>
-          <div className="flex justify-end gap-2">
+          <div className="flex justify-end gap-2 pt-2">
             <Button
               type="button"
               variant="outline"
               onClick={() => setOpen(false)}
+              className="h-9"
             >
               Cancel
             </Button>
-            <Button type="submit">Book Appointment</Button>
+            <Button type="submit" className="h-9 bg-blue-600 hover:bg-blue-700">
+              Book Appointment
+            </Button>
           </div>
         </form>
       </DialogContent>
@@ -1158,21 +1522,21 @@ function EditAppointmentDialog({
       if (!isOpen) setSelectedPetId(appointment.petId);
     }}>
       <DialogTrigger asChild>
-        <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-          <Pencil className="h-4 w-4 mr-2" />
-          Edit
-        </DropdownMenuItem>
+        <Button variant="outline" className="w-full justify-start h-9 font-medium">
+          <Pencil className="h-3.5 w-3.5 mr-2" />
+          Edit Appointment
+        </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="sm:max-w-[480px]">
         <DialogHeader>
-          <DialogTitle>Edit Appointment</DialogTitle>
-          <DialogDescription>
+          <DialogTitle className="text-lg font-semibold">Edit Appointment</DialogTitle>
+          <DialogDescription className="text-sm text-gray-600">
             Update the appointment details below.
           </DialogDescription>
         </DialogHeader>
-        <form action={handleSubmit} className="space-y-4">
+        <form action={handleSubmit} className="space-y-4 pt-4">
           <div className="space-y-2">
-            <Label>Pet *</Label>
+            <Label className="text-sm font-medium">Pet *</Label>
             <SearchableSelect
               options={petOptions}
               value={selectedPetId}
@@ -1184,29 +1548,37 @@ function EditAppointmentDialog({
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="edit-date">Date *</Label>
+              <Label htmlFor="edit-date" className="text-sm font-medium">
+                Date *
+              </Label>
               <Input
                 id="edit-date"
                 name="date"
                 type="date"
                 defaultValue={format(appointmentDate, "yyyy-MM-dd")}
                 required
+                className="h-9"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-time">Time *</Label>
+              <Label htmlFor="edit-time" className="text-sm font-medium">
+                Time *
+              </Label>
               <Input
                 id="edit-time"
                 name="time"
                 type="time"
                 defaultValue={format(appointmentDate, "HH:mm")}
                 required
+                className="h-9"
               />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="edit-duration">Duration (minutes)</Label>
+              <Label htmlFor="edit-duration" className="text-sm font-medium">
+                Duration (min)
+              </Label>
               <Input
                 id="edit-duration"
                 name="duration"
@@ -1214,10 +1586,13 @@ function EditAppointmentDialog({
                 defaultValue={appointment.duration}
                 min="15"
                 step="15"
+                className="h-9"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-service">Service</Label>
+              <Label htmlFor="edit-service" className="text-sm font-medium">
+                Service
+              </Label>
               <select
                 id="edit-service"
                 name="service"
@@ -1234,7 +1609,9 @@ function EditAppointmentDialog({
             </div>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="edit-status">Status</Label>
+            <Label htmlFor="edit-status" className="text-sm font-medium">
+              Status
+            </Label>
             <select
               id="edit-status"
               name="status"
@@ -1247,24 +1624,29 @@ function EditAppointmentDialog({
             </select>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="edit-notes">Notes</Label>
+            <Label htmlFor="edit-notes" className="text-sm font-medium">
+              Notes
+            </Label>
             <textarea
               id="edit-notes"
               name="notes"
               rows={3}
               defaultValue={appointment.notes || ""}
-              className="flex min-h-[60px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex min-h-[72px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none disabled:cursor-not-allowed disabled:opacity-50"
             />
           </div>
-          <div className="flex justify-end gap-2">
+          <div className="flex justify-end gap-2 pt-2">
             <Button
               type="button"
               variant="outline"
               onClick={() => setOpen(false)}
+              className="h-9"
             >
               Cancel
             </Button>
-            <Button type="submit">Save Changes</Button>
+            <Button type="submit" className="h-9 bg-blue-600 hover:bg-blue-700">
+              Save Changes
+            </Button>
           </div>
         </form>
       </DialogContent>
@@ -1292,29 +1674,31 @@ function DeleteAppointmentDialog({
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
       <AlertDialogTrigger asChild>
-        <DropdownMenuItem
-          onSelect={(e) => e.preventDefault()}
-          className="text-destructive focus:text-destructive"
+        <Button
+          variant="outline"
+          className="w-full justify-start h-9 font-medium text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
         >
-          <Trash2 className="h-4 w-4 mr-2" />
-          Delete
-        </DropdownMenuItem>
+          <Trash2 className="h-3.5 w-3.5 mr-2" />
+          Delete Appointment
+        </Button>
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Delete Appointment</AlertDialogTitle>
-          <AlertDialogDescription>
+          <AlertDialogTitle className="text-lg font-semibold">Delete Appointment</AlertDialogTitle>
+          <AlertDialogDescription className="text-sm text-gray-600">
             Are you sure you want to delete this appointment for{" "}
-            {appointment.pet.name} on{" "}
-            {format(new Date(appointment.date), "MMMM d, yyyy")}? This action
-            cannot be undone.
+            <span className="font-semibold text-gray-900">{appointment.pet.name}</span> on{" "}
+            <span className="font-semibold text-gray-900">
+              {format(new Date(appointment.date), "MMMM d, yyyy")}
+            </span>
+            ? This action cannot be undone.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogCancel className="h-9">Cancel</AlertDialogCancel>
           <AlertDialogAction
             onClick={handleDelete}
-            className="bg-destructive text-white hover:bg-destructive/90"
+            className="h-9 bg-red-600 text-white hover:bg-red-700"
           >
             Delete
           </AlertDialogAction>
