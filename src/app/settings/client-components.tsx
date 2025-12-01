@@ -23,11 +23,12 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Settings, Building2, Clock, Scissors, Plus, Pencil, Trash2, ToggleLeft, ToggleRight } from "lucide-react";
+import { Settings, Building2, Clock, Scissors, Plus, Pencil, Trash2, ToggleLeft, ToggleRight, User, LogOut, KeyRound } from "lucide-react";
 import { toast } from "sonner";
 import { updateSettings } from "../actions/settings";
 import { createService, updateService, deleteService, toggleServiceActive } from "../actions/services";
 import { SubmitButton } from "@/components/ui/submit-button";
+import { signOut } from "next-auth/react";
 
 type Settings = {
   id: string;
@@ -60,12 +61,20 @@ const DAYS = [
   { value: "6", label: "Saturday" },
 ];
 
+type User = {
+  id: string;
+  name: string | null;
+  email: string;
+};
+
 export function SettingsPageContent({
   settings,
   services,
+  user,
 }: {
   settings: Settings;
   services: Service[];
+  user: User;
 }) {
   const [selectedDays, setSelectedDays] = useState<string[]>(
     settings.daysOpen.split(",").filter(Boolean)
@@ -107,6 +116,47 @@ export function SettingsPageContent({
             <p className="text-muted-foreground mt-1">
               Configure your business preferences
             </p>
+          </div>
+
+          {/* User Profile */}
+          <div className="rounded-lg border p-6 mb-6 bg-gradient-to-br from-background to-muted/20">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <User className="h-5 w-5 text-muted-foreground" />
+                <h3 className="text-lg font-semibold">User Profile</h3>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => signOut({ callbackUrl: "/login" })}
+                className="gap-2"
+              >
+                <LogOut className="h-4 w-4" />
+                Sign Out
+              </Button>
+            </div>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between py-3 border-b">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Name</p>
+                  <p className="text-base font-medium">{user.name || "Not set"}</p>
+                </div>
+                <UpdateProfileDialog user={user} />
+              </div>
+              <div className="flex items-center justify-between py-3 border-b">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Email</p>
+                  <p className="text-base font-medium">{user.email}</p>
+                </div>
+              </div>
+              <div className="flex items-center justify-between py-3">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Password</p>
+                  <p className="text-base font-medium">••••••••</p>
+                </div>
+                <ChangePasswordDialog />
+              </div>
+            </div>
           </div>
 
           <form action={handleSubmit}>
@@ -479,5 +529,212 @@ function DeleteServiceDialog({ service }: { service: Service }) {
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+  );
+}
+
+function UpdateProfileDialog({ user }: { user: User }) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState(user.name || "");
+  const [loading, setLoading] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      const response = await fetch("/api/user/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to update profile");
+      }
+
+      setOpen(false);
+      toast.success("Profile updated successfully");
+      window.location.reload();
+    } catch (error) {
+      toast.error("Failed to update profile");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="ghost" size="sm" className="gap-2">
+          <Pencil className="h-3.5 w-3.5" />
+          Edit
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Update Profile</DialogTitle>
+          <DialogDescription>
+            Update your personal information
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="profile-name">Name</Label>
+            <Input
+              id="profile-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Your name"
+              disabled={loading}
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="profile-email">Email</Label>
+            <Input
+              id="profile-email"
+              value={user.email}
+              disabled
+              className="bg-muted"
+            />
+            <p className="text-xs text-muted-foreground">
+              Email cannot be changed
+            </p>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={loading}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={loading}>
+              {loading ? "Saving..." : "Save Changes"}
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ChangePasswordDialog() {
+  const [open, setOpen] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError("");
+
+    if (newPassword.length < 8) {
+      setError("Password must be at least 8 characters");
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setError("Passwords do not match");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const response = await fetch("/api/user/password", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to change password");
+      }
+
+      setOpen(false);
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      toast.success("Password changed successfully");
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Failed to change password");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="ghost" size="sm" className="gap-2">
+          <KeyRound className="h-3.5 w-3.5" />
+          Change
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Change Password</DialogTitle>
+          <DialogDescription>
+            Update your account password
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="current-password">Current Password</Label>
+            <Input
+              id="current-password"
+              type="password"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              disabled={loading}
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="new-password">New Password</Label>
+            <Input
+              id="new-password"
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              disabled={loading}
+              required
+              minLength={8}
+            />
+            <p className="text-xs text-muted-foreground">
+              Must be at least 8 characters
+            </p>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="confirm-password">Confirm New Password</Label>
+            <Input
+              id="confirm-password"
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              disabled={loading}
+              required
+              minLength={8}
+            />
+          </div>
+
+          {error && (
+            <div className="rounded-md bg-red-50 p-3 text-sm text-red-800">
+              {error}
+            </div>
+          )}
+
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={loading}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={loading}>
+              {loading ? "Changing..." : "Change Password"}
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
