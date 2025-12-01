@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
-import { Sidebar } from "@/components/sidebar";
+import { ConditionalLayout } from "@/components/conditional-layout";
 import { Toaster } from "sonner";
 import "./globals.css";
 
@@ -22,12 +22,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${inter.variable} font-sans antialiased`}>
-        <div className="flex h-screen overflow-hidden">
-          <Sidebar />
-          <div className="flex-1 flex flex-col overflow-hidden pt-14 md:pt-0">
-            {children}
-          </div>
-        </div>
+        <ConditionalLayout>{children}</ConditionalLayout>
         <Toaster richColors position="top-right" />
       </body>
     </html>
