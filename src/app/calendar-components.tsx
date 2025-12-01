@@ -215,112 +215,7 @@ export function CalendarPageContent({
   const hasActiveFilters = statusFilter || serviceFilter;
 
   return (
-    <div className="flex flex-1 overflow-hidden bg-white">
-      {/* Left Sidebar - Filters */}
-      <aside className="w-64 border-r border-gray-200 bg-gray-50/50 flex flex-col">
-        {/* Sidebar Header */}
-        <div className="px-4 py-6 border-b border-gray-200">
-          <h2 className="text-sm font-semibold text-gray-900 mb-1">Calendar</h2>
-          <p className="text-xs text-gray-500">Manage your schedule</p>
-        </div>
-
-        {/* Search */}
-        <div className="px-4 py-4 border-b border-gray-200">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
-            <Input
-              type="search"
-              placeholder="Search appointments..."
-              className="pl-9 h-9 text-sm bg-white border-gray-300 focus:border-gray-400 focus:ring-0"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-        </div>
-
-        {/* Filters */}
-        <div className="flex-1 overflow-y-auto px-4 py-4">
-          <div className="space-y-6">
-            {/* Status Filter */}
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <label className="text-xs font-semibold text-gray-700 uppercase tracking-wide">
-                  Status
-                </label>
-                {statusFilter && (
-                  <button
-                    onClick={() => setStatusFilter(null)}
-                    className="text-xs text-gray-500 hover:text-gray-700"
-                  >
-                    Clear
-                  </button>
-                )}
-              </div>
-              <div className="space-y-1">
-                <FilterButton
-                  active={statusFilter === "scheduled"}
-                  onClick={() => setStatusFilter(statusFilter === "scheduled" ? null : "scheduled")}
-                  icon={<Clock className="h-3.5 w-3.5" />}
-                  label="Scheduled"
-                  color="blue"
-                />
-                <FilterButton
-                  active={statusFilter === "completed"}
-                  onClick={() => setStatusFilter(statusFilter === "completed" ? null : "completed")}
-                  icon={<CheckCircle className="h-3.5 w-3.5" />}
-                  label="Completed"
-                  color="green"
-                />
-                <FilterButton
-                  active={statusFilter === "cancelled"}
-                  onClick={() => setStatusFilter(statusFilter === "cancelled" ? null : "cancelled")}
-                  icon={<XCircle className="h-3.5 w-3.5" />}
-                  label="Cancelled"
-                  color="red"
-                />
-              </div>
-            </div>
-
-            {/* Service Filter */}
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <label className="text-xs font-semibold text-gray-700 uppercase tracking-wide">
-                  Service Type
-                </label>
-                {serviceFilter && (
-                  <button
-                    onClick={() => setServiceFilter(null)}
-                    className="text-xs text-gray-500 hover:text-gray-700"
-                  >
-                    Clear
-                  </button>
-                )}
-              </div>
-              <div className="space-y-1">
-                {services.map((service) => (
-                  <FilterButton
-                    key={service.id}
-                    active={serviceFilter === service.name}
-                    onClick={() =>
-                      setServiceFilter(serviceFilter === service.name ? null : service.name)
-                    }
-                    icon={<Scissors className="h-3.5 w-3.5" />}
-                    label={service.name}
-                  />
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Sidebar Footer */}
-        <div className="px-4 py-4 border-t border-gray-200">
-          <AddAppointmentDialog pets={pets} services={services} selectedDate={selectedDate} />
-        </div>
-      </aside>
-
-      {/* Main Calendar Area */}
-      <main className="flex-1 flex flex-col overflow-hidden">
+    <main className="flex-1 flex flex-col overflow-hidden bg-white">
         {/* Calendar Header */}
         <header className="border-b border-gray-200 bg-white">
           <div className="px-8 py-5">
@@ -362,8 +257,104 @@ export function CalendarPageContent({
                 </div>
               </div>
 
-              {/* View Controls */}
-              <div className="flex items-center gap-2">
+              {/* Right Side Controls */}
+              <div className="flex items-center gap-3">
+                {/* Search */}
+                <div className="relative w-64">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                  <Input
+                    type="search"
+                    placeholder="Search appointments..."
+                    className="pl-9 h-9 text-sm"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                </div>
+
+                {/* Filters Dropdown */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="h-9 gap-2">
+                      <Filter className="h-4 w-4" />
+                      Filters
+                      {hasActiveFilters && (
+                        <span className="ml-1 h-2 w-2 rounded-full bg-blue-600" />
+                      )}
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    <div className="px-2 py-2">
+                      <p className="text-xs font-semibold text-gray-700 mb-2">STATUS</p>
+                      <div className="space-y-1">
+                        <button
+                          onClick={() => setStatusFilter(statusFilter === "scheduled" ? null : "scheduled")}
+                          className={`w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded ${
+                            statusFilter === "scheduled" ? "bg-blue-50 text-blue-900" : "hover:bg-gray-100"
+                          }`}
+                        >
+                          <Clock className="h-4 w-4" />
+                          Scheduled
+                        </button>
+                        <button
+                          onClick={() => setStatusFilter(statusFilter === "completed" ? null : "completed")}
+                          className={`w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded ${
+                            statusFilter === "completed" ? "bg-green-50 text-green-900" : "hover:bg-gray-100"
+                          }`}
+                        >
+                          <CheckCircle className="h-4 w-4" />
+                          Completed
+                        </button>
+                        <button
+                          onClick={() => setStatusFilter(statusFilter === "cancelled" ? null : "cancelled")}
+                          className={`w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded ${
+                            statusFilter === "cancelled" ? "bg-red-50 text-red-900" : "hover:bg-gray-100"
+                          }`}
+                        >
+                          <XCircle className="h-4 w-4" />
+                          Cancelled
+                        </button>
+                      </div>
+                    </div>
+                    {services.length > 0 && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <div className="px-2 py-2">
+                          <p className="text-xs font-semibold text-gray-700 mb-2">SERVICES</p>
+                          <div className="space-y-1 max-h-48 overflow-y-auto">
+                            {services.map((service) => (
+                              <button
+                                key={service.id}
+                                onClick={() => setServiceFilter(serviceFilter === service.name ? null : service.name)}
+                                className={`w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded ${
+                                  serviceFilter === service.name ? "bg-gray-900 text-white" : "hover:bg-gray-100"
+                                }`}
+                              >
+                                <Scissors className="h-4 w-4" />
+                                {service.name}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </>
+                    )}
+                    {hasActiveFilters && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => {
+                            setStatusFilter(null);
+                            setServiceFilter(null);
+                          }}
+                          className="text-sm text-red-600 cursor-pointer"
+                        >
+                          Clear all filters
+                        </DropdownMenuItem>
+                      </>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                {/* View Mode Toggle */}
                 <div className="inline-flex rounded-lg border border-gray-300 p-0.5 bg-gray-50">
                   <button
                     onClick={() => setViewMode("day")}
@@ -386,6 +377,9 @@ export function CalendarPageContent({
                     Week
                   </button>
                 </div>
+
+                {/* New Appointment Button */}
+                <AddAppointmentDialog pets={pets} services={services} selectedDate={selectedDate} />
               </div>
             </div>
           </div>
@@ -459,7 +453,7 @@ export function CalendarPageContent({
           onClose={() => setSelectedAppointment(null)}
         />
       )}
-    </div>
+    </main>
   );
 }
 
