@@ -1,25 +1,6 @@
 import { auth } from "@/auth";
-import { NextResponse } from "next/server";
 
-export default auth((req) => {
-  const isAuthenticated = !!req.auth;
-  const isAuthPage = req.nextUrl.pathname.startsWith("/login") ||
-                     req.nextUrl.pathname.startsWith("/signup");
-
-  // If user is authenticated and trying to access auth pages, redirect to home
-  if (isAuthenticated && isAuthPage) {
-    return NextResponse.redirect(new URL("/", req.url));
-  }
-
-  // If user is not authenticated and trying to access protected pages, redirect to login
-  if (!isAuthenticated && !isAuthPage) {
-    const loginUrl = new URL("/login", req.url);
-    loginUrl.searchParams.set("callbackUrl", req.nextUrl.pathname);
-    return NextResponse.redirect(loginUrl);
-  }
-
-  return NextResponse.next();
-});
+export default auth;
 
 export const config = {
   matcher: [
