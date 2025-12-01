@@ -109,15 +109,6 @@ export default function LoginPage() {
                 Sign up
               </Link>
             </div>
-
-            <div className="mt-4 rounded-xl border-2 border-primary/20 bg-primary/5 p-4">
-              <p className="text-sm font-bold text-primary">Demo Account</p>
-              <p className="mt-2 text-sm text-foreground/70 font-mono">
-                Email: demo@groomiq.com
-                <br />
-                Password: demo1234
-              </p>
-            </div>
           </form>
         </CardContent>
       </Card>
