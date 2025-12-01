@@ -260,7 +260,7 @@ export function CalendarPageContent({
               {/* Right Side Controls */}
               <div className="flex items-center gap-3">
                 {/* Search */}
-                <div className="relative w-64">
+                <div className="relative w-80">
                   <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                   <Input
                     type="search"
@@ -1364,7 +1364,7 @@ function AddAppointmentDialog({
       if (!isOpen) setSelectedPetId("");
     }}>
       <DialogTrigger asChild>
-        <Button className="w-full h-10 bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-sm">
+        <Button className="h-9 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-sm whitespace-nowrap">
           <Plus className="h-4 w-4 mr-2" />
           New Appointment
         </Button>
