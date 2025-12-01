@@ -431,29 +431,28 @@ export function CalendarPageContent({
             />
           )}
         </div>
+
+        {/* Quick Add Dialog */}
+        {quickAddTime && (
+          <QuickAddDialog
+            services={services}
+            pets={pets}
+            date={quickAddTime.date}
+            hour={quickAddTime.hour}
+            onClose={() => setQuickAddTime(null)}
+          />
+        )}
+
+        {/* Event Details Drawer */}
+        {selectedAppointment && (
+          <EventDetailsDrawer
+            appointment={selectedAppointment}
+            pets={pets}
+            services={services}
+            onClose={() => setSelectedAppointment(null)}
+          />
+        )}
       </main>
-
-      {/* Quick Add Dialog */}
-      {quickAddTime && (
-        <QuickAddDialog
-          services={services}
-          pets={pets}
-          date={quickAddTime.date}
-          hour={quickAddTime.hour}
-          onClose={() => setQuickAddTime(null)}
-        />
-      )}
-
-      {/* Event Details Drawer */}
-      {selectedAppointment && (
-        <EventDetailsDrawer
-          appointment={selectedAppointment}
-          pets={pets}
-          services={services}
-          onClose={() => setSelectedAppointment(null)}
-        />
-      )}
-    </main>
   );
 }
 
