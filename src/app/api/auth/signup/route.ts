@@ -45,6 +45,24 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    // Create default services for the user
+    const defaultServices = [
+      { name: "Bath & Brush", duration: 60, price: 45, description: "Basic bath and brush out", sortOrder: 1 },
+      { name: "Full Groom", duration: 120, price: 85, description: "Complete grooming service including bath, haircut, and styling", sortOrder: 2 },
+      { name: "Haircut", duration: 90, price: 65, description: "Breed-specific haircut and styling", sortOrder: 3 },
+      { name: "Nail Trim", duration: 15, price: 15, description: "Nail trimming and filing", sortOrder: 4 },
+      { name: "Ear Cleaning", duration: 10, price: 10, description: "Ear cleaning and plucking", sortOrder: 5 },
+      { name: "De-shedding Treatment", duration: 45, price: 40, description: "Special treatment to reduce shedding", sortOrder: 6 },
+    ];
+
+    await prisma.service.createMany({
+      data: defaultServices.map(service => ({
+        ...service,
+        userId: user.id,
+        isActive: true,
+      })),
+    });
+
     return NextResponse.json(
       { message: "User created successfully", userId: user.id },
       { status: 201 }
