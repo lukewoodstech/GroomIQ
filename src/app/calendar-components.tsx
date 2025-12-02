@@ -1234,8 +1234,9 @@ function QuickAddDialog({
       await createAppointment(formData);
       onClose();
       toast.success("Appointment booked successfully");
-    } catch {
-      toast.error("Failed to book appointment");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to book appointment";
+      toast.error(message);
     }
   }
 
@@ -1353,8 +1354,9 @@ function AddAppointmentDialog({
       setOpen(false);
       setSelectedPetId("");
       toast.success("Appointment booked successfully");
-    } catch {
-      toast.error("Failed to book appointment");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to book appointment";
+      toast.error(message);
     }
   }
 
