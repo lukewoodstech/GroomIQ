@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { auth } from "@/auth";
+import { canAddClient, getClientLimit } from "@/lib/stripe";
 
 // Validation schema
 const clientSchema = z.object({
@@ -30,6 +31,26 @@ export async function createClient(formData: FormData) {
       throw new Error("Unauthorized");
     }
     const userId = session.user.id;
+
+    // Get user's plan and client count
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { plan: true, _count: { select: { clients: true } } },
+    });
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    // Check if user can add more clients based on their plan
+    const currentClientCount = user._count.clients;
+    const clientLimit = getClientLimit(user.plan);
+
+    if (!canAddClient(currentClientCount, user.plan)) {
+      throw new Error(
+        `You've reached the limit of ${clientLimit} clients on the ${user.plan === "pro" ? "Pro" : "Free"} plan. Upgrade to Pro for unlimited clients.`
+      );
+    }
 
     const rawData = {
       firstName: formData.get("firstName"),

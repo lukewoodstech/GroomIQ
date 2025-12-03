@@ -23,7 +23,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Settings, Building2, Clock, Scissors, Plus, Pencil, Trash2, ToggleLeft, ToggleRight, User, LogOut, KeyRound } from "lucide-react";
+import { Settings, Building2, Clock, Scissors, Plus, Pencil, Trash2, ToggleLeft, ToggleRight, User, LogOut, KeyRound, CreditCard, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { updateSettings } from "../actions/settings";
 import { createService, updateService, deleteService, toggleServiceActive } from "../actions/services";
@@ -65,6 +65,10 @@ type User = {
   id: string;
   name: string | null;
   email: string;
+  plan: string;
+  subscriptionStatus: string | null;
+  clientCount: number;
+  clientLimit: number;
 };
 
 export function SettingsPageContent({
@@ -156,6 +160,78 @@ export function SettingsPageContent({
                 </div>
                 <ChangePasswordDialog />
               </div>
+            </div>
+          </div>
+
+          {/* Subscription */}
+          <div className="rounded-lg border p-6 mb-6 bg-gradient-to-br from-blue-50/50 to-indigo-50/50 dark:from-blue-950/20 dark:to-indigo-950/20">
+            <div className="flex items-center gap-2 mb-4">
+              <CreditCard className="h-5 w-5 text-muted-foreground" />
+              <h3 className="text-lg font-semibold">Subscription</h3>
+            </div>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between py-3 border-b">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Current Plan</p>
+                  <p className="text-base font-semibold flex items-center gap-2">
+                    {user.plan === "pro" ? (
+                      <>
+                        <Sparkles className="h-4 w-4 text-blue-600" />
+                        <span>Pro</span>
+                      </>
+                    ) : (
+                      "Free"
+                    )}
+                  </p>
+                </div>
+                {user.plan === "pro" ? (
+                  <Button
+                    onClick={async () => {
+                      const response = await fetch("/api/stripe/portal", { method: "POST" });
+                      const { url } = await response.json();
+                      window.location.href = url;
+                    }}
+                    variant="outline"
+                    size="sm"
+                  >
+                    Manage Subscription
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={async () => {
+                      const response = await fetch("/api/stripe/checkout", { method: "POST" });
+                      const { url } = await response.json();
+                      window.location.href = url;
+                    }}
+                    className="bg-blue-600 hover:bg-blue-700"
+                    size="sm"
+                  >
+                    <Sparkles className="h-4 w-4 mr-2" />
+                    Upgrade to Pro
+                  </Button>
+                )}
+              </div>
+              <div className="flex items-center justify-between py-3 border-b">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Client Limit</p>
+                  <p className="text-base font-medium">
+                    {user.clientCount} / {user.plan === "pro" ? "Unlimited" : user.clientLimit}
+                  </p>
+                </div>
+              </div>
+              {user.plan === "free" && (
+                <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-4 rounded-lg">
+                  <h4 className="font-semibold mb-2 flex items-center gap-2">
+                    <Sparkles className="h-4 w-4" />
+                    Upgrade to Pro for $10/month
+                  </h4>
+                  <ul className="text-sm space-y-1 mb-3 opacity-90">
+                    <li>• Unlimited clients</li>
+                    <li>• Priority support</li>
+                    <li>• Advanced features</li>
+                  </ul>
+                </div>
+              )}
             </div>
           </div>
 

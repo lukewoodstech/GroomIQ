@@ -3,6 +3,8 @@ import { getServices } from "../actions/services";
 import { SettingsPageContent } from "./client-components";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
+import { prisma } from "@/lib/prisma";
+import { getClientLimit } from "@/lib/stripe";
 
 export default async function SettingsPage() {
   const session = await auth();
@@ -18,10 +20,33 @@ export default async function SettingsPage() {
     redirect("/login");
   }
 
+  // Get user with subscription data and client count
+  const userData = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      plan: true,
+      subscriptionStatus: true,
+      _count: {
+        select: { clients: true },
+      },
+    },
+  });
+
+  if (!userData) {
+    redirect("/login");
+  }
+
   const user = {
-    id: session.user.id!,
-    name: session.user.name || null,
-    email: session.user.email!,
+    id: userData.id,
+    name: userData.name,
+    email: userData.email,
+    plan: userData.plan,
+    subscriptionStatus: userData.subscriptionStatus,
+    clientCount: userData._count.clients,
+    clientLimit: getClientLimit(userData.plan),
   };
 
   return <SettingsPageContent settings={settings} services={services} user={user} />;
