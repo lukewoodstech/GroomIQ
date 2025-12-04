@@ -1,0 +1,45 @@
+sequenceDiagram
+    actor User
+    participant UI as Client Form
+    participant Action as createClient()
+    participant Auth as auth()
+    participant Stripe as Stripe Helper
+    participant Prisma
+    participant DB as PostgreSQL
+    
+    User->>UI: Fill out client form
+    User->>UI: Click "Create Client"
+    UI->>Action: Submit form data
+    
+    Action->>Auth: Get current session
+    Auth->>Action: session.user.id
+    
+    Action->>Prisma: Get user + client count
+    Prisma->>DB: SELECT *, COUNT(clients) FROM users
+    DB->>Prisma: {plan: 'free', clientCount: 9}
+    Prisma->>Action: User data
+    
+    Action->>Stripe: canAddClient(9, 'free')
+    Stripe->>Stripe: Check: 9 < 10 (limit)?
+    Stripe->>Action: true ✅
+    
+    Action->>Prisma: Create client
+    Prisma->>DB: INSERT INTO clients VALUES(...)
+    DB->>Prisma: New client record
+    Prisma->>Action: Client created
+    
+    Action->>UI: revalidatePath('/clients')
+    UI->>User: Show success + updated list
+    
+    rect rgb(255, 200, 200)
+        Note over User,DB: What if user hits limit?
+        User->>UI: Try to add 11th client
+        UI->>Action: Submit form
+        Action->>Prisma: Get user data
+        Prisma->>Action: {plan: 'free', clientCount: 10}
+        Action->>Stripe: canAddClient(10, 'free')
+        Stripe->>Stripe: Check: 10 < 10?
+        Stripe->>Action: false ❌
+        Action->>UI: throw Error("Upgrade to Pro!")
+        UI->>User: Show error message
+    end

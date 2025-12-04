@@ -1,0 +1,67 @@
+graph LR
+    subgraph "Frontend Technologies"
+        React[React 19<br/>UI Library]
+        Next[Next.js 16<br/>Framework]
+        Tailwind[TailwindCSS v4<br/>Styling]
+        Shadcn[Shadcn UI<br/>Components]
+        Lucide[Lucide Icons<br/>Icons]
+    end
+    
+    subgraph "Backend Technologies"
+        NextAPI[Next.js API Routes<br/>Serverless Functions]
+        NextAuth[NextAuth.js v5<br/>Authentication]
+        ServerActions[Server Actions<br/>RPC Layer]
+    end
+    
+    subgraph "Database & ORM"
+        Prisma[Prisma ORM<br/>Type-safe DB Client]
+        Postgres[PostgreSQL<br/>Relational Database]
+    end
+    
+    subgraph "External APIs"
+        StripeSDK[Stripe SDK<br/>Payment Processing]
+        StripeAPI[Stripe API<br/>Subscription Webhooks]
+    end
+    
+    subgraph "Development Tools"
+        TS[TypeScript 5<br/>Type Safety]
+        Zod[Zod<br/>Schema Validation]
+        ReactHookForm[React Hook Form<br/>Form Management]
+        DateFns[date-fns<br/>Date Utilities]
+    end
+    
+    subgraph "Hosting & Infrastructure"
+        Vercel[Vercel<br/>Serverless Deployment]
+        Supabase[Supabase<br/>PostgreSQL Hosting]
+        StripeInfra[Stripe<br/>Payment Infrastructure]
+    end
+    
+    Next --> React
+    Next --> Tailwind
+    Shadcn --> Tailwind
+    Next --> NextAPI
+    Next --> ServerActions
+    NextAPI --> NextAuth
+    ServerActions --> Prisma
+    NextAPI --> Prisma
+    Prisma --> Postgres
+    NextAPI --> StripeSDK
+    StripeSDK --> StripeAPI
+    Vercel -.->|Hosts| Next
+    Supabase -.->|Hosts| Postgres
+    ServerActions --> Zod
+    React --> ReactHookForm
+
+    classDef frontend fill:#4fc3f7,stroke:#01579b,stroke-width:2px,color:#000
+    classDef backend fill:#ffb74d,stroke:#e65100,stroke-width:2px,color:#000
+    classDef database fill:#81c784,stroke:#1b5e20,stroke-width:2px,color:#000
+    classDef external fill:#f06292,stroke:#880e4f,stroke-width:2px,color:#fff
+    classDef tools fill:#ba68c8,stroke:#4a148c,stroke-width:2px,color:#fff
+    classDef infra fill:#90a4ae,stroke:#263238,stroke-width:2px,color:#fff
+    
+    class React,Next,Tailwind,Shadcn,Lucide frontend
+    class NextAPI,NextAuth,ServerActions backend
+    class Prisma,Postgres database
+    class StripeSDK,StripeAPI external
+    class TS,Zod,ReactHookForm,DateFns tools
+    class Vercel,Supabase,StripeInfra infra

@@ -1,0 +1,39 @@
+sequenceDiagram
+    actor User
+    participant Browser
+    participant Middleware
+    participant AuthAPI
+    participant Auth as auth.ts
+    participant Prisma
+    participant DB as PostgreSQL
+    
+    User->>Browser: Navigate to /clients
+    Browser->>Middleware: GET /clients
+    
+    alt No Session Cookie
+        Middleware->>Browser: Redirect to /login
+        Browser->>User: Show login form
+        User->>Browser: Submit email/password
+        Browser->>AuthAPI: POST credentials
+        AuthAPI->>Auth: authorize(credentials)
+        Auth->>Prisma: findUnique(email)
+        Prisma->>DB: SELECT * FROM users WHERE email=?
+        DB->>Prisma: User record
+        Prisma->>Auth: User object
+        Auth->>Auth: bcrypt.compare(password, hash)
+        
+        alt Password Valid
+            Auth->>AuthAPI: Return user
+            AuthAPI->>Browser: Set session cookie (JWT)
+            Browser->>Middleware: GET /clients (with cookie)
+            Middleware->>Browser: Allow access
+            Browser->>User: Show clients page
+        else Password Invalid
+            Auth->>AuthAPI: Return null
+            AuthAPI->>Browser: 401 Unauthorized
+            Browser->>User: Show error
+        end
+    else Has Valid Session
+        Middleware->>Browser: Allow access
+        Browser->>User: Show clients page
+    end

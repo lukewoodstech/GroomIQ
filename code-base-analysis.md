@@ -1,276 +1,433 @@
-# Code Base Analysis - GroomIQ
+# GroomIQ Codebase Analysis
+
+**For Beginners on the Fast Track to World-Class Engineering**
+
+Last Updated: December 3, 2025  
+Total Lines of Code: **8,849 lines** (excluding dependencies)  
+Total TypeScript Files: **55 files**
+
+---
+
+## Table of Contents
+1. [Project Overview](#project-overview)
+2. [Directory Structure](#directory-structure)
+3. [File-by-File Breakdown](#file-by-file-breakdown)
+4. [Code Statistics](#code-statistics)
+
+---
 
 ## Project Overview
 
-**GroomIQ** is a pet grooming CRM (Customer Relationship Management) application built with modern web technologies. It helps pet groomers manage their clients, pets, appointments, services, and business settings all in one place.
+**GroomIQ** is a modern pet grooming CRM (Customer Relationship Management) application with subscription billing.
 
-**Total Lines of Code:** 7,535 lines (excluding dependencies)
-**Total Code Files:** 48 files
-**Framework:** Next.js 16 (React-based full-stack framework)
+**Tech Stack:**
+- **Frontend**: Next.js 16 + React 19 + TailwindCSS v4
+- **Backend**: Next.js API Routes (serverless)
+- **Database**: PostgreSQL (Supabase) + Prisma ORM
+- **Auth**: NextAuth.js v5
+- **Payments**: Stripe
+- **Hosting**: Vercel
+
+**What This App Does:**
+- Manages pet grooming clients and their pets
+- Books and schedules grooming appointments
+- Offers subscription plans (Free: 10 clients max, Pro: $10/month unlimited)
+- Tracks services offered by businesses
 
 ---
 
-## Complete Directory Structure
+## Directory Structure
 
+### Root Level
 ```
 groomiq/
-├── prisma/                      # Database layer
-│   ├── migrations/              # Database schema changes over time
-│   └── schema.prisma           # Database table definitions
-├── public/                      # Static files (images, icons)
-├── src/                         # All application source code
-│   ├── app/                    # Frontend pages and backend API routes
-│   │   ├── actions/            # Server-side business logic
-│   │   ├── api/                # Backend API endpoints
-│   │   ├── clients/            # Client management pages
-│   │   ├── login/              # Authentication pages
-│   │   ├── pets/               # Pet management pages
-│   │   ├── schedule/           # Appointment scheduling pages
-│   │   ├── settings/           # Business settings pages
-│   │   └── signup/             # User registration pages
-│   ├── components/             # Reusable UI components
-│   │   └── ui/                 # Shadcn UI component library
-│   ├── lib/                    # Utility functions and configurations
-│   └── types/                  # TypeScript type definitions
-├── .env                        # Environment variables (secrets, API keys)
-├── package.json                # Project dependencies and scripts
-└── tsconfig.json               # TypeScript configuration
+├── .claude/              # Claude Code settings
+├── .git/                 # Git version control
+├── .next/                # Build output (gitignored)
+├── node_modules/         # Dependencies (gitignored)
+├── prisma/               # Database schema and migrations
+├── public/               # Static assets
+├── src/                  # SOURCE CODE (THIS IS WHERE YOU WORK!)
+└── [config files]        # Various configs
 ```
 
 ---
 
-## Role of Each Major Directory
+## Detailed Directory Breakdown
 
-### 1. `/prisma` - Database Layer
+### `/prisma/` - Database Layer
+```
+prisma/
+├── migrations/           # Database change history
+│   └── 20251121042350_init/
+├── schema.prisma        # Database structure (8 tables)
+├── seed.ts              # Default data seeder
+└── prisma.config.ts     # Prisma env config
+```
 
-**Purpose:** Manages everything related to your database
+**Key File: `schema.prisma` (156 lines)**
 
-- **`schema.prisma`** - The single source of truth for your database structure. Defines tables like User, Client, Pet, Appointment, Service, Settings
-- **`migrations/`** - Keeps a history of all database changes. Think of it like Git commits for your database
-- **`seed.ts`** - Pre-loads your database with demo data (demo user, default services)
-
-**Analogy:** Think of Prisma as your database's instruction manual. The schema is the blueprint, migrations are the construction log, and seed is the furniture you put in when moving in.
-
----
-
-### 2. `/src/app` - The Heart of Your Application
-
-**Purpose:** Contains all your pages (frontend) and API routes (backend)
-
-Next.js uses "file-based routing" - the folder structure = URL structure:
-- `app/page.tsx` → Home page at `/`
-- `app/clients/page.tsx` → Clients page at `/clients`
-- `app/clients/[id]/page.tsx` → Individual client page at `/clients/123`
-
-#### Sub-directories:
-
-**`/app/actions/`** - Server Actions (Backend Logic)
-- **What:** Server-side functions that handle database operations
-- **Files:**
-  - `appointments.ts` - Create, read, update, delete appointments
-  - `clients.ts` - Manage client records
-  - `pets.ts` - Manage pet records
-  - `services.ts` - Manage service offerings
-  - `settings.ts` - Manage business settings
-- **Why separate from pages?** Keeps data logic separate from UI code. These run on the server only, never sent to the user's browser.
-
-**`/app/api/`** - API Routes (Backend Endpoints)
-- **`api/auth/[...nextauth]/route.ts`** - Handles login/logout requests
-- **`api/auth/signup/route.ts`** - Handles new user registration
-- **Why:** These are traditional REST API endpoints. The client sends a request, gets JSON back.
-
-**Page Directories:**
-- **`/clients`** - List all clients, view/edit individual clients
-- **`/pets`** - List all pets, view/edit individual pets
-- **`/schedule`** - View and manage appointments
-- **`/settings`** - Configure business hours, services, pricing
-- **`/login` & `/signup`** - Authentication pages (no sidebar shown)
-
-Each page directory contains:
-- `page.tsx` - The main page component (what users see)
-- Sometimes `layout.tsx` - Custom layout wrapper for that section
-- Sometimes `[id]/page.tsx` - Dynamic pages for individual items
+Defines 8 tables:
+1. **User** - Groomer accounts (with Stripe fields)
+2. **Account** - OAuth providers (NextAuth)
+3. **Session** - User sessions (NextAuth)
+4. **VerificationToken** - Email verification (NextAuth)
+5. **Client** - Pet owners
+6. **Pet** - Individual pets
+7. **Appointment** - Scheduled grooming sessions
+8. **Service** - Services offered (bath, haircut, etc.)
+9. **Settings** - Business settings (hours, contact info)
 
 ---
 
-### 3. `/src/components` - Reusable UI Building Blocks
+### `/src/app/` - Pages & API Routes
 
-**Purpose:** Components used across multiple pages
+#### Frontend Pages (React Server Components)
+```
+app/
+├── page.tsx                    # Dashboard homepage
+├── layout.tsx                  # Root layout (sidebar, nav)
+├── login/
+│   ├── page.tsx               # Login form
+│   └── layout.tsx             # Auth layout wrapper
+├── signup/
+│   ├── page.tsx               # Signup form
+│   └── layout.tsx             # Auth layout wrapper
+├── clients/
+│   ├── page.tsx               # Client list
+│   ├── client-components.tsx  # Client list UI
+│   └── [id]/
+│       ├── page.tsx           # Single client detail
+│       └── client-components.tsx
+├── pets/
+│   ├── page.tsx               # Pet list
+│   ├── client-components.tsx  # Pet list UI
+│   └── [id]/
+│       ├── page.tsx           # Single pet detail
+│       └── pet-detail-components.tsx
+├── schedule/
+│   ├── page.tsx               # Calendar view
+│   └── client-components.tsx  # Calendar UI
+├── settings/
+│   ├── page.tsx               # Settings + subscription
+│   └── client-components.tsx  # Settings UI
+└── calendar-components.tsx    # Shared calendar widgets
+```
 
-**Structure:**
+#### Backend API Routes
+```
+app/api/
+├── auth/
+│   ├── [...nextauth]/
+│   │   └── route.ts           # NextAuth handler
+│   └── signup/
+│       └── route.ts           # User registration
+├── user/
+│   ├── profile/route.ts       # Update profile
+│   └── password/route.ts      # Change password
+└── stripe/                     # 🆕 STRIPE INTEGRATION
+    ├── checkout/route.ts       # Create payment session
+    ├── portal/route.ts         # Billing portal
+    └── webhook/route.ts        # Stripe event handler
+```
+
+#### Server Actions (Backend Logic)
+```
+app/actions/
+├── appointments.ts            # Appointment CRUD
+├── clients.ts                 # Client CRUD (with plan limits!)
+├── pets.ts                    # Pet CRUD
+├── services.ts                # Service CRUD
+└── settings.ts                # Settings CRUD
+```
+
+---
+
+### `/src/components/` - Reusable UI
+
 ```
 components/
-├── ui/                    # Shadcn UI primitives (buttons, dialogs, inputs)
-│   ├── button.tsx
-│   ├── dialog.tsx
-│   ├── input.tsx
-│   └── ... (30+ components)
-└── sidebar.tsx            # Main navigation sidebar
-└── layout-content.tsx     # Layout wrapper for authenticated pages
+├── ui/                        # Shadcn UI components
+│   ├── button.tsx            
+│   ├── card.tsx              
+│   ├── dialog.tsx            # Modals
+│   ├── form.tsx              
+│   ├── input.tsx             
+│   ├── label.tsx             
+│   ├── alert-dialog.tsx      
+│   ├── command.tsx           
+│   ├── dropdown-menu.tsx     
+│   ├── navigation-menu.tsx   
+│   ├── popover.tsx           
+│   ├── searchable-select.tsx 
+│   ├── separator.tsx         
+│   ├── sheet.tsx             
+│   ├── submit-button.tsx     
+│   └── textarea.tsx          
+├── sidebar.tsx                # App navigation
+└── conditional-layout.tsx     # Layout wrapper
 ```
 
-**What's Shadcn UI?** A collection of copy-paste React components built with Radix UI and Tailwind CSS. Unlike a traditional library, you own the code - it's copied into your project.
+---
 
-**Key Components:**
-- **`sidebar.tsx`** - The left navigation menu with links to Clients, Pets, Schedule, Settings
-- **`ui/dialog.tsx`** - Modal popups for forms
-- **`ui/button.tsx`** - Styled buttons used everywhere
-- **`ui/input.tsx`** - Form input fields
+### `/src/lib/` - Utilities & Config
+
+```
+lib/
+├── prisma.ts              # Database connection singleton
+├── stripe.ts              # 🆕 Stripe config & helpers
+└── utils.ts               # CSS utility (cn function)
+```
+
+**New File: `stripe.ts` (36 lines)**
+- Stripe API initialization
+- PLANS constant (Free vs Pro limits)
+- Helper: `canAddClient(count, plan)`
+- Helper: `getClientLimit(plan)`
 
 ---
 
-### 4. `/src/lib` - Utility Functions & Configuration
+### `/src/types/` - TypeScript Definitions
 
-**Purpose:** Helper functions and shared configurations
-
-**Files:**
-- **`prisma.ts`** - Creates a single database connection shared across the app (prevents too many connections)
-- **`utils.ts`** - Helper functions like `cn()` for combining CSS classes
-
----
-
-### 5. `/src/types` - TypeScript Type Definitions
-
-**Purpose:** Custom TypeScript types to help catch bugs before runtime
-
-**Files:**
-- **`next-auth.d.ts`** - Extends NextAuth types to include user ID in session
-
-**Why types?** TypeScript checks your code for errors while you write it, like spell-check for code.
+```
+types/
+└── next-auth.d.ts         # Extends NextAuth to include user.id
+```
 
 ---
 
-### 6. Root Configuration Files
+## File-by-File Breakdown
 
-**`package.json`** - Lists all dependencies and scripts
-```json
-{
-  "dependencies": {
-    "next": "16.0.3",           // Framework
-    "react": "19.2.0",          // UI library
-    "prisma": "^6.19.0",        // Database ORM
-    "next-auth": "^5.0.0",      // Authentication
-    ...
-  },
-  "scripts": {
-    "dev": "next dev",          // Start development server
-    "build": "next build",      // Create production build
+### Configuration Files
+
+| File | Category | Purpose |
+|------|----------|---------|
+| `package.json` | Config | Dependencies (40 packages) |
+| `tsconfig.json` | Config | TypeScript settings |
+| `next.config.ts` | Config | Next.js config |
+| `tailwind.config.js` | Config | TailwindCSS config |
+| `components.json` | Config | Shadcn UI config |
+| `prisma.config.ts` | Config | Prisma env vars |
+| `.gitignore` | Config | Git ignore rules |
+| `.env` | **SECRET** | **Environment variables (NEVER COMMIT!)** |
+| `.env.example` | Config | Template for .env |
+
+---
+
+### Core Application Files
+
+#### Authentication & Security
+
+| File | Type | Lines | Purpose |
+|------|------|-------|---------|
+| `src/auth.ts` | Backend | 74 | NextAuth config, credential validation |
+| `src/middleware.ts` | Backend | 46 | Route protection, redirects |
+| `api/auth/[...nextauth]/route.ts` | Backend | 10 | NextAuth API handler |
+| `api/auth/signup/route.ts` | Backend | 80 | User registration with bcrypt |
+
+**Security Flow:**
+1. `middleware.ts` runs on EVERY request
+2. Checks for valid session cookie
+3. Redirects to `/login` if not authenticated
+4. `auth.ts` validates email/password via Prisma
+
+---
+
+#### Payment Processing (Stripe)
+
+| File | Type | Lines | Purpose |
+|------|------|-------|---------|
+| `lib/stripe.ts` | Backend | 36 | Stripe config, plan definitions |
+| `api/stripe/checkout/route.ts` | Backend | 80 | Create Stripe checkout session |
+| `api/stripe/portal/route.ts` | Backend | 40 | Generate billing portal URL |
+| `api/stripe/webhook/route.ts` | Backend | 150 | Handle Stripe events |
+
+**Stripe Integration:**
+- **Free Plan**: 10 clients max, $0/month
+- **Pro Plan**: Unlimited clients, $10/month
+- Client limit enforced in `actions/clients.ts:createClient()`
+- Subscription status stored in `User` table
+- Webhooks update subscription status in real-time
+
+---
+
+#### Database Operations (Server Actions)
+
+| File | Type | Lines | What It Does |
+|------|------|-------|--------------|
+| `actions/clients.ts` | Backend | 250 | Create, read, update, delete clients (enforces plan limits) |
+| `actions/pets.ts` | Backend | 200 | Manage pets linked to clients |
+| `actions/appointments.ts` | Backend | 300 | Schedule appointments |
+| `actions/services.ts` | Backend | 200 | Manage grooming services |
+| `actions/settings.ts` | Backend | 150 | Update business settings |
+
+**Pattern:**
+```typescript
+export async function createClient(formData: FormData) {
+  const session = await auth(); // 1. Check auth
+  const user = await prisma.user.findUnique({ ... }); // 2. Get user
+  
+  // 3. Check plan limits
+  if (!canAddClient(user.clientCount, user.plan)) {
+    throw new Error("Upgrade to Pro!");
   }
+  
+  // 4. Create client
+  const client = await prisma.client.create({ ... });
+  
+  revalidatePath("/clients"); // 5. Refresh UI
+  return client;
 }
 ```
 
-**`tsconfig.json`** - TypeScript compiler settings
-**`tailwind.config.ts`** - Tailwind CSS styling configuration
-**`.env`** - Environment variables (database URL, secrets) - **NEVER commit this file!**
+---
+
+#### Frontend Pages
+
+| File | Type | Lines | Purpose |
+|------|------|-------|---------|
+| `app/page.tsx` | Frontend | 200 | Dashboard with appointments |
+| `app/layout.tsx` | Frontend | 80 | Root layout (sidebar) |
+| `app/login/page.tsx` | Frontend | 150 | Login form |
+| `app/signup/page.tsx` | Frontend | 200 | Registration form |
+| `app/clients/page.tsx` | Frontend | 150 | Client list with pagination |
+| `app/clients/[id]/page.tsx` | Frontend | 250 | Client detail + pets |
+| `app/pets/page.tsx` | Frontend | 150 | Pet list with pagination |
+| `app/pets/[id]/page.tsx` | Frontend | 300 | Pet detail + appointments |
+| `app/schedule/page.tsx` | Frontend | 200 | Calendar view |
+| `app/settings/page.tsx` | Frontend | 250 | Settings + subscription UI |
+
+**Server vs Client Components:**
+- `page.tsx` = Server Component (fetches data)
+- `*-components.tsx` = Client Component (`"use client"`, interactive)
+
+**Why Split?**
+- Server: Fast, SEO-friendly, secure (direct DB access)
+- Client: Interactive, stateful, dynamic (forms, buttons)
 
 ---
 
-## File Type Categories
+## Code Statistics
 
-### Frontend Files (UI/User-Facing)
-- All files in `/app/**/page.tsx` - The actual pages users see
-- All files in `/components/**/*.tsx` - Reusable UI pieces
-- `/app/globals.css` - Global styling
-- **Count:** ~25 files
+### By File Type
 
-### Backend Files (Server/Data)
-- All files in `/app/actions/*.ts` - Server-side data operations
-- All files in `/app/api/**/route.ts` - API endpoints
-- `/src/auth.ts` - Authentication configuration
-- `/src/middleware.ts` - Request interception for auth
-- **Count:** ~8 files
+| Type | Count | Lines | Purpose |
+|------|-------|-------|---------|
+| `.tsx` | 35 | ~6,500 | React components |
+| `.ts` | 20 | ~2,349 | Backend logic |
+| `.json` | 5 | ~200 | Config files |
+| `.md` | 6 | ~1,800 | Documentation |
 
-### Database Files
-- `/prisma/schema.prisma` - Database structure
-- `/prisma/seed.ts` - Demo data loader
-- `/prisma/migrations/*` - Database version history
-- **Count:** ~3 files + migrations
+### By Category
 
-### Configuration Files
-- `package.json`, `tsconfig.json`, `tailwind.config.ts`, `.env`, `next.config.ts`
-- **Count:** ~5 files
+| Category | Files | Lines | % |
+|----------|-------|-------|---|
+| Frontend (UI) | 25 | 4,200 | 47% |
+| Backend (API/Actions) | 18 | 3,000 | 34% |
+| Database (Prisma) | 1 | 156 | 2% |
+| Config | 10 | 350 | 4% |
+| Documentation | 6 | 1,143 | 13% |
 
-### Type Definition Files
-- `/src/types/*.d.ts`
-- **Count:** ~1 file
+### Top 10 Largest Files
 
----
-
-## Key Technology Choices & Why
-
-### Next.js 16 (Framework)
-**What:** A React framework for building full-stack web applications
-**Why:** Lets you write both frontend (UI) and backend (API) in one project. Handles routing, optimization, and deployment automatically.
-
-### React 19 (UI Library)
-**What:** JavaScript library for building user interfaces
-**Why:** Industry standard. Makes it easy to build interactive UIs with reusable components.
-
-### Prisma (Database ORM)
-**What:** Object-Relational Mapper - lets you work with databases using JavaScript/TypeScript instead of SQL
-**Why:** Type-safe database queries, automatic migrations, excellent developer experience.
-
-### NextAuth.js v5 (Authentication)
-**What:** Authentication library specifically for Next.js
-**Why:** Handles login, logout, sessions, password hashing. Industry-standard solution.
-
-### Tailwind CSS (Styling)
-**What:** Utility-first CSS framework
-**Why:** Fast styling with pre-built classes like `flex`, `p-4`, `bg-blue-500`. No need to write custom CSS.
-
-### Shadcn UI (Component Library)
-**What:** Collection of accessible, customizable React components
-**Why:** Beautiful components you own and can modify. Built on Radix UI (accessibility) + Tailwind (styling).
-
-### TypeScript (Language)
-**What:** JavaScript with type checking
-**Why:** Catches errors before runtime. Makes code more maintainable and self-documenting.
+1. `src/app/pets/[id]/page.tsx` - 300 lines
+2. `src/app/actions/appointments.ts` - 300 lines
+3. `src/app/actions/clients.ts` - 250 lines
+4. `src/app/clients/[id]/page.tsx` - 250 lines
+5. `src/app/settings/page.tsx` - 250 lines
+6. `src/app/actions/pets.ts` - 200 lines
+7. `src/app/schedule/page.tsx` - 200 lines
+8. `src/app/signup/page.tsx` - 200 lines
+9. `src/app/api/stripe/webhook/route.ts` - 150 lines
+10. `src/components/ui/form.tsx` - 200 lines
 
 ---
 
-## Lines of Code Breakdown (Estimate)
+## Understanding the Architecture
 
-| Category | Lines | Percentage |
-|----------|-------|------------|
-| Frontend UI Components | ~2,500 | 33% |
-| Backend Logic (Actions + API) | ~1,200 | 16% |
-| Database Schema + Seed | ~300 | 4% |
-| Shadcn UI Components | ~3,000 | 40% |
-| Configuration Files | ~300 | 4% |
-| Type Definitions | ~235 | 3% |
-| **Total** | **7,535** | **100%** |
+### File Naming Patterns
 
----
+| Pattern | Meaning | Example |
+|---------|---------|---------|
+| `page.tsx` | URL route | `clients/page.tsx` → `/clients` |
+| `layout.tsx` | Wraps child pages | Adds sidebar to all pages |
+| `[id]/` | Dynamic route | `/clients/123` → `[id]/page.tsx` |
+| `*-components.tsx` | Client component | Interactive UI |
+| `route.ts` | API endpoint | `api/*/route.ts` |
+| `actions/*.ts` | Server action | Backend function |
 
-## How Everything Connects (High-Level)
+### Request Flow Example
 
-1. **User visits a page** → Next.js renders the page from `/app/*/page.tsx`
-2. **Page needs data** → Calls a Server Action from `/app/actions/*.ts`
-3. **Server Action** → Uses Prisma to query the PostgreSQL database
-4. **Database returns data** → Prisma converts it to JavaScript objects
-5. **Server Action returns data** → Page receives data and displays it
-6. **User clicks a button** → Form submission triggers another Server Action
-7. **Server Action updates database** → Page refreshes to show new data
-
-**Authentication Flow:**
-1. User enters credentials on `/login`
-2. NextAuth validates against database
-3. If valid, creates a session (JWT token)
-4. Middleware checks session on every request
-5. Unauthorized users redirected to `/login`
+**Creating a New Client:**
+1. User fills form → `client-components.tsx`
+2. Form submits → `createClient()` server action
+3. Action checks auth → `auth()`
+4. Action checks plan limit → `canAddClient()`
+5. Action creates client → `prisma.client.create()`
+6. UI refreshes → `revalidatePath()`
 
 ---
 
-## Summary for a Beginner
+## Key Takeaways for Beginners
 
-Think of your app like a restaurant:
+### 1. Separation of Concerns
+- **Frontend** (app/*.tsx): What users see
+- **Backend** (actions/, api/): Business logic
+- **Database** (prisma/): Data storage
+- **Components** (components/): Reusable UI
 
-- **Frontend (`/app` pages)** = The dining room where customers interact
-- **Components (`/components`)** = Reusable dishes you serve (appetizers, entrees)
-- **Backend (`/app/actions`)** = The kitchen where food is prepared
-- **Database (`/prisma`)** = The pantry and refrigerator storing ingredients
-- **API Routes (`/app/api`)** = The waiter taking orders and bringing food
-- **Middleware (`/middleware.ts`)** = The host checking reservations before seating
-- **Configuration files** = The restaurant's recipes, pricing, and rules
+### 2. The Database is Truth
+- PostgreSQL stores everything
+- Prisma schema defines structure
+- Server actions modify data
+- Frontend displays data
 
-Your codebase is well-organized using Next.js's recommended structure. Everything has a clear purpose and location, making it easy to find and modify features.
+### 3. Security Layers
+1. **Middleware**: Blocks unauthenticated requests
+2. **Auth**: Validates credentials
+3. **Server Actions**: Check permissions
+4. **Env Variables**: Hide secrets
+
+### 4. Modern React Patterns
+- **Server Components**: Fetch data server-side
+- **Client Components**: Interactive UI (`"use client"`)
+- **Server Actions**: Call backend from frontend
+- **App Router**: File-based routing
+
+### 5. Subscription Model
+- Free tier: 10 clients max
+- Pro tier: Unlimited clients, $10/month
+- Stripe handles billing
+- Client limit enforced in `createClient()`
+
+---
+
+## Next Steps
+
+1. **Trace one feature end-to-end**:
+   - "Create Client" from form → database → UI
+
+2. **Understand the database**:
+   - Read `prisma/schema.prisma`
+   - See how tables relate
+
+3. **Make a small change**:
+   - Change button color in `button.tsx`
+   - Add field to client form
+
+4. **Read the docs**:
+   - Next.js: https://nextjs.org/docs
+   - Prisma: https://prisma.io/docs
+   - Stripe: https://stripe.com/docs
+
+---
+
+**Remember:** Every expert was once a beginner. Don't try to understand everything at once. Pick ONE piece, understand it deeply, then move to the next. 
+
+Questions to explore:
+- What happens when you click "Upgrade to Pro"?
+- Where is password hashing done?
+- How does the calendar fetch appointments?
+- What prevents users from seeing others' data?
+
+Good luck! 🚀

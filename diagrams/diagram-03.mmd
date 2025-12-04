@@ -1,0 +1,51 @@
+sequenceDiagram
+    actor User
+    participant Settings as Settings Page
+    participant Checkout as /api/stripe/checkout
+    participant Stripe as Stripe API
+    participant Browser
+    participant Webhook as /api/stripe/webhook
+    participant Prisma
+    participant DB as PostgreSQL
+    
+    rect rgb(200, 220, 255)
+        Note over User,Stripe: Upgrade to Pro Flow
+        User->>Settings: Click "Upgrade to Pro"
+        Settings->>Checkout: POST /api/stripe/checkout
+        Checkout->>Prisma: Get user data
+        Prisma->>DB: SELECT * FROM users
+        DB->>Prisma: User record
+        
+        alt User has no Stripe customer
+            Checkout->>Stripe: Create customer
+            Stripe->>Checkout: customer_id
+            Checkout->>Prisma: Update user.stripeCustomerId
+            Prisma->>DB: UPDATE users SET stripeCustomerId=?
+        end
+        
+        Checkout->>Stripe: Create checkout session
+        Stripe->>Checkout: session URL
+        Checkout->>Settings: Return checkout URL
+        Settings->>Browser: Redirect to Stripe checkout
+        Browser->>User: Show Stripe payment form
+    end
+    
+    rect rgb(255, 240, 200)
+        Note over User,DB: User Completes Payment
+        User->>Stripe: Submit payment (card: 4242...)
+        Stripe->>Stripe: Process payment
+        Stripe->>Webhook: POST checkout.session.completed
+        
+        Webhook->>Webhook: Verify signature
+        Webhook->>Prisma: Update subscription status
+        Prisma->>DB: UPDATE users SET<br/>plan='pro',<br/>subscriptionStatus='active',<br/>stripeSubscriptionId=?
+        DB->>Prisma: Success
+        Webhook->>Stripe: 200 OK
+        
+        Stripe->>Browser: Redirect to success URL
+        Browser->>Settings: Navigate to /settings?success=true
+        Settings->>Prisma: Fetch updated user
+        Prisma->>DB: SELECT * FROM users
+        DB->>Settings: User with plan='pro'
+        Settings->>User: Show "Pro Plan" badge
+    end

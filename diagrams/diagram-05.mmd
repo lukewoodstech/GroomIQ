@@ -1,0 +1,94 @@
+erDiagram
+    USER ||--o{ CLIENT : owns
+    USER ||--o{ PET : manages
+    USER ||--o{ APPOINTMENT : schedules
+    USER ||--o{ SERVICE : defines
+    USER ||--o| SETTINGS : has
+    USER ||--o{ ACCOUNT : "auth providers"
+    USER ||--o{ SESSION : "active sessions"
+    
+    CLIENT ||--o{ PET : owns
+    PET ||--o{ APPOINTMENT : "booked for"
+    
+    USER {
+        string id PK
+        string email UK
+        string password
+        string name
+        string plan "free|pro"
+        string subscriptionStatus "active|past_due|canceled"
+        string stripeCustomerId UK
+        string stripeSubscriptionId UK
+        datetime createdAt
+    }
+    
+    CLIENT {
+        string id PK
+        string userId FK
+        string firstName
+        string lastName
+        string email
+        string phone
+        datetime createdAt
+    }
+    
+    PET {
+        string id PK
+        string userId FK
+        string clientId FK
+        string name
+        string species
+        string breed
+        int age
+        string notes
+    }
+    
+    APPOINTMENT {
+        string id PK
+        string userId FK
+        string petId FK
+        datetime date
+        int duration
+        string service
+        string status "scheduled|completed|cancelled"
+        string notes
+    }
+    
+    SERVICE {
+        string id PK
+        string userId FK
+        string name
+        int duration
+        float price
+        string description
+        boolean isActive
+        int sortOrder
+    }
+    
+    SETTINGS {
+        string id PK
+        string userId FK
+        string businessName
+        string businessEmail
+        string businessPhone
+        int defaultDuration
+        string openTime
+        string closeTime
+        string daysOpen
+    }
+    
+    ACCOUNT {
+        string id PK
+        string userId FK
+        string provider "google|github"
+        string providerAccountId
+        string refresh_token
+        string access_token
+    }
+    
+    SESSION {
+        string id PK
+        string userId FK
+        string sessionToken UK
+        datetime expires
+    }

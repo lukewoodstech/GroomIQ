@@ -1,0 +1,51 @@
+graph TB
+    subgraph "Developer Workflow"
+        Dev[Local Development]
+        Git[GitHub Repository]
+        Dev -->|git push| Git
+    end
+    
+    subgraph "CI/CD Pipeline"
+        Git -->|Webhook| VercelCI[Vercel CI/CD]
+        VercelCI -->|npm install| Install[Install Dependencies]
+        Install -->|prisma generate| PrismaGen[Generate Prisma Client]
+        PrismaGen -->|next build| Build[Build Next.js App]
+        Build -->|Deploy| Edge[Vercel Edge Network]
+    end
+    
+    subgraph "Production Environment (Vercel)"
+        Edge -->|Route| Functions[Serverless Functions]
+        Functions --> API[API Routes]
+        Functions --> SSR[Server Components]
+        Functions --> Actions[Server Actions]
+        
+        Static[Static Assets<br/>/_next/static/]
+        Edge --> Static
+    end
+    
+    subgraph "External Services (Production)"
+        API --> SupabaseDB[Supabase PostgreSQL<br/>Connection Pool]
+        Actions --> SupabaseDB
+        API --> StripeProd[Stripe API<br/>Live Mode]
+        StripeProd -->|Webhooks| Functions
+    end
+    
+    subgraph "Monitoring & Logs"
+        Functions --> VercelLogs[Vercel Logs]
+        StripeProd --> StripeDash[Stripe Dashboard]
+        SupabaseDB --> SupabaseLog[Supabase Logs]
+    end
+    
+    Users[End Users] -->|HTTPS| Edge
+
+    classDef dev fill:#e3f2fd,stroke:#1976d2
+    classDef build fill:#fff3e0,stroke:#f57c00
+    classDef prod fill:#f1f8e9,stroke:#689f38
+    classDef external fill:#fce4ec,stroke:#c2185b
+    classDef monitor fill:#f3e5f5,stroke:#7b1fa2
+    
+    class Dev,Git dev
+    class VercelCI,Install,PrismaGen,Build build
+    class Edge,Functions,API,SSR,Actions,Static prod
+    class SupabaseDB,StripeProd external
+    class VercelLogs,StripeDash,SupabaseLog monitor

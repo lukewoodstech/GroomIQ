@@ -1,584 +1,1021 @@
-# Data Flow Analysis - GroomIQ
+# Data Flow Analysis for GroomIQ
 
-## Overview
+This document traces the complete data flows through the GroomIQ application, showing how data moves from user interactions through the system to the database and back.
 
-This document traces how data moves through your application from the moment a user interacts with the UI to when data is stored in the database and displayed back. We'll follow real user actions step-by-step with specific file names and function names.
-
----
-
-## 1. What Happens When a User First Loads the App?
-
-### Step-by-Step: Initial Page Load at `http://localhost:3000`
-
-**Step 1: Browser Request**
-```
-User types URL → Browser sends GET request to http://localhost:3000/
-```
-
-**Step 2: Middleware Intercepts Request**
-- **File:** `/src/middleware.ts`
-- **Function:** `auth()` (default export)
-- **What happens:**
-  ```typescript
-  export default auth((req) => {
-    const isAuthenticated = !!req.auth;  // Check if user has valid session
-    const isAuthPage = req.nextUrl.pathname.startsWith("/login") ||
-                       req.nextUrl.pathname.startsWith("/signup");
-
-    // If not authenticated and trying to access protected page → redirect to login
-    if (!isAuthenticated && !isAuthPage) {
-      const loginUrl = new URL("/login", req.url);
-      return NextResponse.redirect(loginUrl);
-    }
-  })
-  ```
-- **Result:** Unauthenticated users are redirected to `/login`
-
-**Step 3: If User is Authenticated → Render Homepage**
-- **File:** `/src/app/page.tsx`
-- **Component:** `Home()`
-- **What happens:**
-  1. Next.js server-side renders the page
-  2. Calls `getAppointments()` to fetch appointment data
-  3. Calls `getPets()` to fetch pets for the appointment form
-
-**Step 4: Fetch Appointments**
-- **File:** `/src/app/actions/appointments.ts`
-- **Function:** `getAppointments()`
-  ```typescript
-  export async function getAppointments() {
-    const session = await auth();  // Get current user's session
-    if (!session?.user?.id) {
-      return [];  // No user = no data
-    }
-
-    return await prisma.appointment.findMany({
-      where: { userId: session.user.id },  // ONLY this user's appointments
-      orderBy: { date: "asc" },
-      include: {
-        pet: {
-          include: { client: true }  // Also get pet and client info
-        }
-      }
-    });
-  }
-  ```
-- **Database Query:** Prisma translates to SQL:
-  ```sql
-  SELECT * FROM appointments
-  WHERE userId = 'current-user-id'
-  ORDER BY date ASC
-  JOIN pets ON appointments.petId = pets.id
-  JOIN clients ON pets.clientId = clients.id
-  ```
-
-**Step 5: Render Page with Data**
-- **File:** `/src/app/page.tsx`
-- **What renders:**
-  - `/src/components/sidebar.tsx` - Left navigation
-  - Appointment calendar/list with all appointments
-  - Forms to create new appointments
-
-**Step 6: Browser Receives HTML + JavaScript**
-```
-Server → Sends rendered HTML
-       → Browser displays page
-       → React hydrates (makes page interactive)
-```
-
-**Total Time:** ~500-800ms for authenticated users, instant redirect for unauthenticated
+## Table of Contents
+1. [Initial App Load Flow](#initial-app-load-flow)
+2. [User Authentication Flow](#user-authentication-flow)
+3. [Creating a Client Flow](#creating-a-client-flow)
+4. [Stripe Payment Processing Flow](#stripe-payment-processing-flow)
+5. [Database Schema Overview](#database-schema-overview)
 
 ---
 
-## 2. What Happens When a User Creates a New Client?
+## Initial App Load Flow
 
-Let's trace the **FULL data flow** when a user clicks "Add Client" and submits the form.
+**What happens when a user first loads the app:**
 
-### Step-by-Step: Creating a New Client
+### Step 1: Request Reaches Middleware
+**File:** `/src/middleware.ts`
 
-**Step 1: User Clicks "Add Client" Button**
-- **File:** `/src/app/clients/page.tsx`
-- **Component:** `ClientsPage`
-- **Action:** Opens a Dialog (modal popup)
-  ```typescript
-  <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-    <DialogContent>
-      <ClientForm onSuccess={() => setCreateOpen(false)} />
-    </DialogContent>
-  </Dialog>
-  ```
+When any page is requested, Next.js first executes the middleware:
+- Checks if user has a session token in cookies (`authjs.session-token` or `__Secure-authjs.session-token`)
+- Determines if the requested path is a public route (login/signup) or protected route
+- Makes routing decision based on authentication status
 
-**Step 2: User Fills Out Form**
-- **File:** `/src/app/clients/page.tsx` (ClientForm component inline)
-- **Fields:** First Name, Last Name, Email, Phone
-- **Form Library:** React Hook Form + Zod validation
-  ```typescript
-  const form = useForm({
-    resolver: zodResolver(clientSchema),
-    defaultValues: {
-      firstName: "",
-      lastName: "",
-      email: "",
-      phone: "",
-    }
-  });
-  ```
+**Decision Tree:**
+```
+Is user authenticated?
+├─ YES
+│  └─ Trying to access login/signup?
+│     ├─ YES → Redirect to home page "/"
+│     └─ NO → Allow request to continue
+└─ NO
+   └─ Trying to access protected route?
+      ├─ YES → Redirect to "/login?callbackUrl={original-path}"
+      └─ NO → Allow request to continue (auth pages)
+```
 
-**Step 3: User Clicks "Create Client"**
-- **Trigger:** `onSubmit()` function
-  ```typescript
-  async function onSubmit(values: z.infer<typeof clientSchema>) {
-    try {
-      const formData = new FormData();
-      formData.append("firstName", values.firstName);
-      formData.append("lastName", values.lastName);
-      formData.append("email", values.email || "");
-      formData.append("phone", values.phone || "");
+### Step 2: Page Component Loads
+**File:** `/src/app/page.tsx` (if authenticated)
 
-      await createClient(formData);  // Call Server Action
+For the home page (calendar/schedule view):
+1. Server component executes three parallel data fetches:
+   - `getAppointments()` - fetches all user's appointments from database
+   - `getPets()` - fetches all user's pets from database
+   - `getActiveServices()` - fetches all user's active services from database
 
-      toast.success("Client created");
-      onSuccess();
-    } catch (error) {
-      toast.error(error.message);
-    }
-  }
-  ```
+2. Each function:
+   - Calls `auth()` from `/src/auth.ts` to get current user session
+   - If no session, returns empty data
+   - If session exists, queries PostgreSQL via Prisma with user ID filter
 
-**Step 4: Server Action Receives Request**
-- **File:** `/src/app/actions/clients.ts`
-- **Function:** `createClient(formData: FormData)`
-- **Server:** This code runs on the server, NOT in browser
-  ```typescript
-  export async function createClient(formData: FormData) {
-    try {
-      // 1. Authenticate
-      const session = await auth();
-      if (!session?.user?.id) {
-        throw new Error("Unauthorized");
-      }
-      const userId = session.user.id;
+3. Data is passed to `CalendarPageContent` client component for rendering
 
-      // 2. Extract form data
-      const rawData = {
-        firstName: formData.get("firstName"),
-        lastName: formData.get("lastName"),
-        email: formData.get("email") || "",
-        phone: formData.get("phone") || "",
-      };
+### Step 3: Layout Renders
+**File:** `/src/app/layout.tsx` → `/src/components/conditional-layout.tsx`
 
-      // 3. Validate with Zod
-      const validated = clientSchema.parse(rawData);
+1. Root layout wraps everything in HTML structure with Inter font
+2. `ConditionalLayout` component checks current pathname:
+   - If on `/login` or `/signup`: renders children directly (no sidebar)
+   - If on any other page: renders `Sidebar` + children in a flex layout
 
-      // 4. Check for duplicates
-      const existing = await prisma.client.findFirst({
-        where: {
-          userId,
-          OR: [
-            validated.email ? { email: validated.email } : {},
-            validated.phone ? { phone: validated.phone } : {},
-          ].filter((condition) => Object.keys(condition).length > 0),
-        },
-      });
+3. Toaster component (from Sonner library) is added for notifications
 
-      if (existing) {
-        if (existing.email === validated.email && validated.email) {
-          throw new Error("A client with this email already exists");
-        }
-        if (existing.phone === validated.phone && validated.phone) {
-          throw new Error("A client with this phone number already exists");
-        }
-      }
+### Step 4: Session Verification
+**File:** `/src/auth.ts`
 
-      // 5. Create in database
-      await prisma.client.create({
+The `auth()` function:
+1. Retrieves JWT from session cookie
+2. Decodes JWT to extract user ID
+3. Returns session object with user information
+4. No database query needed (JWT-based sessions for performance)
+
+**Complete Flow Diagram:**
+```
+User enters URL
+    ↓
+middleware.ts checks cookie
+    ↓
+Has session token? → NO → Redirect to /login
+    ↓ YES
+page.tsx Server Component
+    ↓
+Parallel Data Fetches:
+├─ getAppointments() → Prisma → PostgreSQL
+├─ getPets() → Prisma → PostgreSQL
+└─ getActiveServices() → Prisma → PostgreSQL
+    ↓
+Data returned to page
+    ↓
+CalendarPageContent renders with data
+    ↓
+ConditionalLayout adds Sidebar
+    ↓
+Browser displays complete page
+```
+
+---
+
+## User Authentication Flow
+
+### Sign Up Flow
+
+**Files involved:**
+- `/src/app/signup/page.tsx` (UI)
+- `/src/app/api/auth/signup/route.ts` (API)
+- `/src/auth.ts` (NextAuth config)
+
+**Step-by-step process:**
+
+1. **User fills form** (`/src/app/signup/page.tsx`)
+   - Name, email, password, confirm password
+   - Client-side validation: passwords match, minimum 8 characters
+
+2. **Form submission** (Client → Server)
+   - POST request to `/api/auth/signup`
+   - Body: `{ name, email, password }`
+
+3. **Server processes signup** (`/src/app/api/auth/signup/route.ts`)
+   ```
+   Receive POST request
+       ↓
+   Validate with Zod schema (email format, password length)
+       ↓
+   Check if email already exists in database
+       ↓
+   Hash password with bcrypt (10 salt rounds)
+       ↓
+   Create user in database with default values:
+       - plan: "free"
+       - subscriptionStatus: "free"
+       - stripeCustomerId: null
+       - stripeSubscriptionId: null
+       ↓
+   Create default settings record for user
+       ↓
+   Create 6 default services for user:
+       - Bath & Brush ($45, 60min)
+       - Full Groom ($85, 120min)
+       - Haircut ($65, 90min)
+       - Nail Trim ($15, 15min)
+       - Ear Cleaning ($10, 10min)
+       - De-shedding Treatment ($40, 45min)
+       ↓
+   Return success response
+   ```
+
+4. **Auto-login after signup**
+   - Client calls `signIn("credentials", { email, password, redirect: false })`
+   - Triggers NextAuth credential provider
+
+5. **NextAuth processes login** (`/src/auth.ts`)
+   ```
+   Validate credentials with Zod
+       ↓
+   Query database for user by email
+       ↓
+   Compare password with bcrypt
+       ↓
+   If match: Generate JWT token
+       ↓
+   Set session cookie
+       ↓
+   Return user object
+   ```
+
+6. **Redirect to home**
+   - Router pushes to `/`
+   - Middleware sees session token, allows access
+   - User starts on FREE plan with 10 client limit
+
+### Login Flow
+
+**Files involved:**
+- `/src/app/login/page.tsx` (UI)
+- `/src/auth.ts` (NextAuth config)
+
+**Step-by-step process:**
+
+1. **User submits credentials**
+   - Email and password entered
+
+2. **Call NextAuth signIn**
+   - `signIn("credentials", { email, password, redirect: false })`
+
+3. **Credentials Provider authorize function** (`/src/auth.ts`)
+   ```
+   Validate input with Zod
+       ↓
+   Find user in database by email
+       ↓
+   Check if user exists and has password
+       ↓
+   Compare passwords with bcrypt
+       ↓
+   If valid: return user object { id, email, name }
+   If invalid: return null
+   ```
+
+4. **JWT callback** (`/src/auth.ts`)
+   - Adds user ID to JWT token
+   - Token stored in cookie
+
+5. **Session callback** (`/src/auth.ts`)
+   - Extracts user ID from JWT
+   - Adds to session object
+
+6. **Success**
+   - Session cookie set
+   - User redirected to home or callback URL
+
+### Middleware Authentication Check
+
+**File:** `/src/middleware.ts`
+
+On every request:
+```
+Extract cookies from request
+    ↓
+Look for session token:
+    - authjs.session-token (development)
+    - __Secure-authjs.session-token (production/HTTPS)
+    ↓
+Token exists?
+├─ YES → User is authenticated
+└─ NO → User is not authenticated
+    ↓
+Apply routing rules based on path and auth status
+```
+
+**Why this approach:**
+- JWT tokens = No database lookup on every request (fast!)
+- Middleware runs on Edge runtime (super fast, globally distributed)
+- Session validated only when needed in Server Actions
+
+---
+
+## Creating a Client Flow
+
+**What happens when user clicks "Add Client" and submits the form:**
+
+### Complete Flow Diagram
+
+```
+User clicks "Add Client" button
+    ↓
+Modal/Dialog opens with form (Client Component)
+    ↓
+User fills in:
+    - First Name (required)
+    - Last Name (required)
+    - Email (optional)
+    - Phone (optional)
+    ↓
+User clicks "Save"
+    ↓
+Form data → FormData object
+    ↓
+Call createClient(formData) Server Action
+    ↓
+═══════════════════════════════════════════
+SERVER ACTION: /src/app/actions/clients.ts
+═══════════════════════════════════════════
+    ↓
+Step 1: Authentication
+    - Call auth() to get session
+    - Extract userId from session
+    - If no session → throw "Unauthorized" error
+    ↓
+Step 2: Check Client Limit (STRIPE INTEGRATION)
+    - Query database for user's plan and client count
+    - Get current client count: user._count.clients
+    - Get plan limit from /src/lib/stripe.ts:
+      * Free plan: 10 clients max
+      * Pro plan: Unlimited (Infinity)
+    - Check if canAddClient(currentCount, userPlan)
+    - If limit reached → throw error:
+      "You've reached the limit of 10 clients on the Free plan.
+       Upgrade to Pro for unlimited clients."
+    ↓
+Step 3: Validate Input
+    - Parse FormData with Zod schema:
+      * firstName: 1-100 chars
+      * lastName: 1-100 chars
+      * email: valid email or empty → null
+      * phone: valid phone pattern or empty → null
+    - If validation fails → throw Zod error
+    ↓
+Step 4: Check for Duplicates
+    - If email or phone provided:
+      * Query database for existing client with same email OR phone
+      * Scoped to current user's clients only
+    - If duplicate found → throw specific error message
+    ↓
+Step 5: Create Client
+    - Insert into PostgreSQL via Prisma:
+      prisma.client.create({
         data: {
-          firstName: validated.firstName,
-          lastName: validated.lastName,
-          email: validated.email,
-          phone: validated.phone,
-          userId,  // CRITICAL: Associates with current user
-        },
-      });
-
-      // 6. Revalidate cache
-      revalidatePath("/clients", "layout");
-
-      return { success: true };
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        throw new Error(error.issues[0].message);
-      }
-      throw error;
-    }
-  }
-  ```
-
-**Step 5: Prisma Executes Database Query**
-- **File:** Prisma Client (auto-generated)
-- **SQL Query:**
-  ```sql
-  INSERT INTO clients (id, firstName, lastName, email, phone, userId, createdAt, updatedAt)
-  VALUES (
-    'clx123abc456',           -- Auto-generated ID
-    'John',                   -- firstName
-    'Doe',                    -- lastName
-    'john@example.com',       -- email
-    '555-1234',               -- phone
-    'user-session-id',        -- userId (current logged-in user)
-    '2025-11-21T04:00:00Z',  -- createdAt
-    '2025-11-21T04:00:00Z'   -- updatedAt
-  );
-  ```
-
-**Step 6: Database Confirms Insert**
-```
-PostgreSQL → Returns success
-Prisma → Confirms to Server Action
-Server Action → Returns { success: true }
+          firstName,
+          lastName,
+          email,
+          phone,
+          userId
+        }
+      })
+    - Database assigns:
+      * id: auto-generated CUID
+      * createdAt: current timestamp
+      * updatedAt: current timestamp
+    ↓
+Step 6: Revalidate Cache
+    - Call revalidatePath("/clients", "layout")
+    - Next.js invalidates all cached client pages
+    - Forces fresh data fetch on next render
+    ↓
+Step 7: Return Success
+    - Return { success: true }
+    ↓
+═══════════════════════════════════════════
+BACK TO CLIENT COMPONENT
+═══════════════════════════════════════════
+    ↓
+Success response received
+    ↓
+Close modal/dialog
+    ↓
+Show success toast notification (Sonner)
+    ↓
+UI automatically updates (revalidation triggered)
+    ↓
+New client appears in list
 ```
 
-**Step 7: Frontend Receives Response**
-- **File:** `/src/app/clients/page.tsx`
-- **What happens:**
-  ```typescript
-  await createClient(formData);  // Resolves successfully
-  toast.success("Client created");  // Show success message
-  onSuccess();  // Close dialog
-  ```
+### Database Transaction Details
 
-**Step 8: Page Automatically Refreshes**
-- **Trigger:** `revalidatePath("/clients", "layout")`
-- **What happens:** Next.js re-fetches `getClients()` in the background
-- **File:** `/src/app/actions/clients.ts`
-  ```typescript
-  export async function getClients(page: number = 1, itemsPerPage: number = 20) {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return { clients: [], total: 0, page, itemsPerPage, totalPages: 0 };
-    }
+**What gets stored in PostgreSQL:**
 
-    const [clients, total] = await Promise.all([
-      prisma.client.findMany({
-        where: { userId: session.user.id },
-        skip: (page - 1) * itemsPerPage,
-        take: itemsPerPage,
-        orderBy: { createdAt: "desc" },
-        include: { pets: true },
-      }),
-      prisma.client.count({
-        where: { userId: session.user.id },
-      }),
-    ]);
+Table: `clients`
+```sql
+INSERT INTO clients (
+    id,              -- "cljn8..." (CUID - collision-resistant unique ID)
+    firstName,       -- "John"
+    lastName,        -- "Smith"
+    email,           -- "john@example.com" or NULL
+    phone,           -- "555-1234" or NULL
+    userId,          -- "clk9..." (references users table)
+    createdAt,       -- "2025-12-03T10:30:00.000Z"
+    updatedAt        -- "2025-12-03T10:30:00.000Z"
+) VALUES (...);
+```
 
-    return { clients, total, page, itemsPerPage, totalPages: Math.ceil(total / itemsPerPage) };
-  }
-  ```
+**Why each field exists:**
+- `id`: Unique identifier, used in URLs and relationships
+- `firstName/lastName`: Required for display and search
+- `email/phone`: Optional contact info, validated for duplicates
+- `userId`: Links client to specific user (data isolation)
+- `createdAt/updatedAt`: Audit trail, sorting by date added
 
-**Step 9: UI Updates with New Client**
-- New client appears in the list
-- Total count updates
-- Dialog closes
+### Error Handling
 
-**Total Time:** ~200-500ms from button click to seeing new client
+The flow includes multiple validation points:
+
+1. **Client-side validation** (UI component)
+   - Empty required fields
+   - Form constraints
+
+2. **Server-side validation** (Server Action)
+   - Zod schema validation
+   - **Client limit check (Free: 10 max, Pro: unlimited)**
+   - Duplicate email/phone check
+   - User ownership verification
+
+3. **Database constraints**
+   - Foreign key: userId must exist in users table
+   - Unique constraints enforced at DB level
+   - Cascade deletes: if user deleted, their clients are too
+
+**If error occurs:**
+```
+Error thrown in Server Action
+    ↓
+Caught by try/catch
+    ↓
+Error message returned to client
+    ↓
+Toast notification shows error
+    ↓
+Form stays open with data intact
+    ↓
+User can correct and retry
+```
 
 ---
 
-## 3. Where Does User Authentication Happen?
+## Stripe Payment Processing Flow
 
-### Authentication Flow: Login Process
+GroomIQ uses Stripe for subscription management with two plans:
+- **Free Plan:** 10 clients max, $0/month
+- **Pro Plan:** Unlimited clients, $10/month
 
-**Step 1: User Visits `/login`**
-- **File:** `/src/app/login/page.tsx`
-- **Component:** `LoginPage` (client component)
-- **Renders:** Email/password form + demo credentials
+### Subscription Checkout Flow
 
-**Step 2: User Submits Credentials**
-- **File:** `/src/app/login/page.tsx`
-- **Function:** `handleSubmit()`
-  ```typescript
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError("");
-    setLoading(true);
+**Files involved:**
+- `/src/app/settings/page.tsx` (UI trigger)
+- `/src/app/api/stripe/checkout/route.ts` (Creates checkout session)
+- `/src/lib/stripe.ts` (Stripe client and plan config)
 
-    try {
-      const result = await signIn("credentials", {
-        email,
-        password,
-        redirect: false,  // Don't auto-redirect, handle manually
-      });
+**Step-by-step process:**
 
-      if (result?.error) {
-        setError("Invalid email or password");
-      } else {
-        router.push("/");  // Redirect to home
-        router.refresh();  // Refresh to get new session
-      }
-    } catch (error) {
-      setError("An error occurred. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  }
-  ```
-
-**Step 3: NextAuth Processes Login**
-- **File:** `/src/auth.ts`
-- **Provider:** Credentials
-  ```typescript
-  providers: [
-    CredentialsProvider({
-      async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
-          return null;
-        }
-
-        // 1. Find user in database
-        const user = await prisma.user.findUnique({
-          where: { email: credentials.email as string },
-        });
-
-        if (!user || !user.password) {
-          return null;  // User doesn't exist
-        }
-
-        // 2. Verify password
-        const isPasswordValid = await bcrypt.compare(
-          credentials.password as string,
-          user.password
-        );
-
-        if (!isPasswordValid) {
-          return null;  // Wrong password
-        }
-
-        // 3. Return user object (creates session)
-        return {
-          id: user.id,
+```
+User clicks "Upgrade to Pro" button in Settings
+    ↓
+Client sends POST to /api/stripe/checkout
+    ↓
+═══════════════════════════════════════════════════
+CHECKOUT API: /src/app/api/stripe/checkout/route.ts
+═══════════════════════════════════════════════════
+    ↓
+Step 1: Verify Authentication
+    - Call auth() to get session
+    - Extract user ID
+    - If not authenticated → return 401 Unauthorized
+    ↓
+Step 2: Get User Data
+    - Query database for user by ID
+    - Check if user already has stripeSubscriptionId
+    ↓
+Step 3: Handle Existing Subscription
+    - If user already subscribed:
+      * Create Stripe billing portal session instead
+      * Return billing portal URL
+      * User redirected to manage subscription
+    ↓
+Step 4: Create/Get Stripe Customer
+    - Check if user has stripeCustomerId
+    - If NO:
+      * Call stripe.customers.create({
           email: user.email,
           name: user.name,
-        };
+          metadata: { userId: user.id }
+        })
+      * Update user record with stripeCustomerId
+    - If YES: use existing customer ID
+    ↓
+Step 5: Create Checkout Session
+    - Call stripe.checkout.sessions.create({
+        customer: customerId,
+        mode: "subscription",
+        payment_method_types: ["card"],
+        line_items: [{
+          price: PLANS.PRO.priceId,  // From env: STRIPE_PRO_PRICE_ID
+          quantity: 1
+        }],
+        success_url: "/settings?success=true",
+        cancel_url: "/settings?canceled=true",
+        metadata: { userId: user.id }
+      })
+    ↓
+Step 6: Return Checkout URL
+    - Return { url: checkoutSession.url }
+    ↓
+═══════════════════════════════════════════════════
+BACK TO CLIENT
+═══════════════════════════════════════════════════
+    ↓
+Client receives checkout URL
+    ↓
+Browser redirects to Stripe Checkout page
+    ↓
+User enters payment information on Stripe's secure page
+    ↓
+User completes payment
+    ↓
+Stripe redirects back to /settings?success=true
+    ↓
+Stripe sends webhook to server (parallel process)
+```
+
+### Webhook Processing Flow
+
+**File:** `/src/app/api/stripe/webhook/route.ts`
+
+**What happens when Stripe sends a webhook:**
+
+```
+Stripe sends POST to /api/stripe/webhook
+    ↓
+Request contains:
+    - Event data (subscription info)
+    - Stripe signature header
+    ↓
+═══════════════════════════════════════════════
+WEBHOOK API: /src/app/api/stripe/webhook/route.ts
+═══════════════════════════════════════════════
+    ↓
+Step 1: Verify Signature
+    - Extract stripe-signature header
+    - Call stripe.webhooks.constructEvent(
+        body,
+        signature,
+        process.env.STRIPE_WEBHOOK_SECRET
+      )
+    - If signature invalid → return 400 Bad Request
+    - This ensures webhook is from Stripe, not an attacker
+    ↓
+Step 2: Process Event by Type
+    ↓
+┌─────────────────────────────────────────────────┐
+│ EVENT: checkout.session.completed               │
+│ (User just completed payment)                   │
+├─────────────────────────────────────────────────┤
+│ Extract from session:                           │
+│   - userId from metadata                        │
+│   - customer (Stripe customer ID)               │
+│   - subscription (Stripe subscription ID)       │
+│     ↓                                            │
+│ Update database:                                │
+│   prisma.user.update({                          │
+│     where: { id: userId },                      │
+│     data: {                                     │
+│       stripeCustomerId: session.customer,       │
+│       stripeSubscriptionId: session.subscription│
+│       subscriptionStatus: "active",             │
+│       plan: "pro"                               │
+│     }                                           │
+│   })                                            │
+│     ↓                                            │
+│ User now has Pro plan access!                   │
+│ Can create unlimited clients!                   │
+└─────────────────────────────────────────────────┘
+    ↓
+┌─────────────────────────────────────────────────┐
+│ EVENT: customer.subscription.updated            │
+│ (Subscription status changed)                   │
+├─────────────────────────────────────────────────┤
+│ Extract from subscription:                      │
+│   - status (active, past_due, canceled, etc)    │
+│   - customer (Stripe customer ID)               │
+│     ↓                                            │
+│ Find user by stripeCustomerId                   │
+│     ↓                                            │
+│ Update database:                                │
+│   - subscriptionStatus = subscription.status    │
+│   - plan = "pro" if active, "free" if not       │
+└─────────────────────────────────────────────────┘
+    ↓
+┌─────────────────────────────────────────────────┐
+│ EVENT: customer.subscription.deleted            │
+│ (User canceled subscription)                    │
+├─────────────────────────────────────────────────┤
+│ Find user by stripeCustomerId                   │
+│     ↓                                            │
+│ Update database:                                │
+│   - subscriptionStatus = "canceled"             │
+│   - plan = "free"                               │
+│   - stripeSubscriptionId = null                 │
+│     ↓                                            │
+│ User downgraded to Free plan                    │
+│ Client limit reduced to 10                      │
+│ Existing clients NOT deleted                    │
+│ Can't add new clients if over 10                │
+└─────────────────────────────────────────────────┘
+    ↓
+┌─────────────────────────────────────────────────┐
+│ EVENT: invoice.payment_failed                   │
+│ (Payment method declined)                       │
+├─────────────────────────────────────────────────┤
+│ Find user by stripeCustomerId                   │
+│     ↓                                            │
+│ Update database:                                │
+│   - subscriptionStatus = "past_due"             │
+│ (User keeps Pro access temporarily,             │
+│  but should update payment)                     │
+└─────────────────────────────────────────────────┘
+    ↓
+Return { received: true } to Stripe
+    ↓
+Stripe marks webhook as successful
+```
+
+### Client Limit Enforcement
+
+**Files involved:**
+- `/src/lib/stripe.ts` (Plan definitions)
+- `/src/app/actions/clients.ts` (Enforcement in createClient)
+
+**How limits are enforced:**
+
+```
+PLAN DEFINITIONS (/src/lib/stripe.ts):
+
+export const PLANS = {
+  FREE: {
+    name: "Free",
+    clientLimit: 10,
+    price: 0
+  },
+  PRO: {
+    name: "Pro",
+    clientLimit: Infinity,
+    price: 10,
+    priceId: process.env.STRIPE_PRO_PRICE_ID
+  }
+} as const;
+```
+
+**When user tries to create client:**
+
+```
+createClient() Server Action starts
+    ↓
+Query user with client count:
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        plan: true,
+        _count: { select: { clients: true } }
       }
     })
-  ]
-  ```
-
-**Step 4: Database Query for User**
-```sql
-SELECT * FROM users WHERE email = 'demo@groomiq.com' LIMIT 1;
+    ↓
+Extract values:
+    - currentClientCount = user._count.clients (e.g., 10)
+    - userPlan = user.plan (e.g., "free")
+    ↓
+Get limit:
+    const clientLimit = getClientLimit(userPlan)
+    // Returns 10 for "free", Infinity for "pro"
+    ↓
+Check if can add:
+    if (!canAddClient(currentClientCount, userPlan)) {
+      throw new Error(
+        "You've reached the limit of 10 clients on the Free plan.
+         Upgrade to Pro for unlimited clients."
+      )
+    }
+    ↓
+If check passes, proceed with creating client
 ```
 
-**Step 5: Password Verification**
-- **Library:** bcryptjs
-- **Process:**
-  ```javascript
-  const isPasswordValid = await bcrypt.compare(
-    "demo1234",                        // Plain text password from form
-    "$2a$10$xyzHashedPasswordHash"     // Hashed password from database
-  );
-  // Returns true or false
-  ```
+**Why this approach:**
+- Real-time enforcement (can't bypass)
+- Database-backed (accurate count)
+- Clear upgrade path (error message includes upsell)
 
-**Step 6: Create Session (JWT)**
-- **File:** `/src/auth.ts`
-- **Callbacks:**
-  ```typescript
-  callbacks: {
-    async jwt({ token, user }) {
-      if (user) {
-        token.id = user.id;  // Add user ID to JWT token
-      }
-      return token;
-    },
-    async session({ session, token }) {
-      if (session.user) {
-        session.user.id = token.id as string;  // Add user ID to session
-      }
-      return session;
+### Billing Portal Flow
+
+**File:** `/src/app/api/stripe/portal/route.ts`
+
+**When user clicks "Manage Subscription":**
+
+```
+POST to /api/stripe/portal
+    ↓
+Verify user is authenticated
+    ↓
+Get user's stripeCustomerId
+    ↓
+Create Stripe billing portal session:
+    stripe.billingPortal.sessions.create({
+      customer: user.stripeCustomerId,
+      return_url: "/settings"
+    })
+    ↓
+Return portal URL
+    ↓
+User redirected to Stripe portal
+    ↓
+User can:
+    - Update payment method
+    - View invoices
+    - Cancel subscription
+    - Download receipts
+    ↓
+When done, redirected back to /settings
+```
+
+### Subscription Status Flow
+
+**How subscription status affects the app:**
+
+```
+User loads any page requiring client count check
+    ↓
+Server component/action gets user data
+    ↓
+User record includes:
+    {
+      plan: "free" | "pro",
+      subscriptionStatus: "free" | "active" | "past_due" | "canceled" | "trialing",
+      stripeCustomerId: "cus_...",
+      stripeSubscriptionId: "sub_..."
     }
-  }
-  ```
-- **Result:** Encrypted JWT token stored in cookie
-  ```
-  Set-Cookie: next-auth.session-token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...;
-  ```
-
-**Step 7: Redirect to Home**
-- Middleware sees valid session
-- Allows access to `/`
-- User is logged in!
-
----
-
-## 4. Where Does Payment Processing Happen?
-
-**Current Status:** Payment processing (Stripe) is NOT yet implemented in this version.
-
-**Placeholder for Future Implementation:**
-- Would add `/src/app/api/stripe/checkout/route.ts` - Create Stripe checkout session
-- Would add `/src/app/api/stripe/webhook/route.ts` - Handle payment confirmations
-- Would add `subscriptions` table to Prisma schema
+    ↓
+Status determines:
+    - Client limit (10 vs Unlimited)
+    - UI display (Free badge vs Pro badge)
+    - Available actions (Create client button enabled/disabled)
+    ↓
+If status = "past_due":
+    - User still has Pro access (grace period)
+    - Warning shown to update payment
+    ↓
+If status = "canceled":
+    - Downgraded to Free plan
+    - Client limit reduced to 10
+    - Existing clients not deleted
+    - Can't add new clients if over limit
+```
 
 ---
 
-## 5. What Data is Stored in the Database?
+## Database Schema Overview
 
-### Database Tables (from `/prisma/schema.prisma`)
+**File:** `/prisma/schema.prisma`
 
-**User Table** - Stores groomer accounts
+### Tables and Their Purpose
+
+#### 1. User Table
+**Purpose:** Store user accounts and subscription info
+
 ```prisma
 model User {
-  id       String   @id @default(cuid())
-  email    String   @unique
-  password String?
-  name     String?
-  clients  Client[]
-  pets     Pet[]
-  appointments Appointment[]
-  services Service[]
-  settings Settings?
-  accounts Account[]
-  sessions Session[]
+  id                   String   // Unique ID (CUID)
+  name                 String?  // Display name
+  email                String   @unique  // Login credential
+  emailVerified        DateTime?  // For OAuth providers
+  image                String?  // Profile picture URL
+  password             String?  // Hashed with bcrypt (for credentials auth)
+
+  // Stripe subscription fields
+  stripeCustomerId     String?  @unique  // Links to Stripe customer
+  stripeSubscriptionId String?  @unique  // Current subscription
+  subscriptionStatus   String?  @default("free")  // Status
+  plan                 String   @default("free")  // "free" or "pro"
+
+  // Timestamps
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  // Relations
+  accounts             Account[]
+  sessions             Session[]
+  clients              Client[]
+  pets                 Pet[]
+  appointments         Appointment[]
+  services             Service[]
+  settings             Settings?
 }
 ```
-**Why:** One account per groomer. Each groomer sees only their data.
 
----
+**Why these fields:**
+- `id`: Primary key, used in all relations
+- `email`: Unique identifier for login
+- `password`: Hashed, null if using OAuth
+- `stripeCustomerId`: Links to Stripe for billing
+- `stripeSubscriptionId`: Current active subscription
+- `subscriptionStatus`: Real-time status from webhooks
+- `plan`: Determines client limit (10 vs unlimited)
+- Relations: One user has many clients, pets, appointments, etc.
 
-**Client Table** - Stores pet owners
+#### 2. Client Table
+**Purpose:** Store customer/client contact information
+
 ```prisma
 model Client {
-  id        String   @id @default(cuid())
-  firstName String
-  lastName  String
-  email     String?
-  phone     String?
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  pets      Pet[]
+  id        String   // Unique ID
+  firstName String   // Required
+  lastName  String   // Required
+  email     String?  // Optional contact
+  phone     String?  // Optional contact
+  userId    String   // Owner (foreign key)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pets      Pet[]    // One client has many pets
 }
 ```
-**Why:** Track pet owners (customers). Each client belongs to one groomer.
 
----
+**Why cascade delete:**
+- When user deleted → all their clients deleted
+- Prevents orphaned data
 
-**Pet Table** - Stores pets
+**Why email/phone optional:**
+- Some clients may not have email
+- Flexibility for different contact preferences
+
+#### 3. Pet Table
+**Purpose:** Store pet information (pets belong to clients)
+
 ```prisma
 model Pet {
-  id        String   @id @default(cuid())
-  name      String
-  breed     String?
-  species   String   // "dog", "cat", "other"
-  age       Int?
-  notes     String?
-  clientId  String
-  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id           String   // Unique ID
+  name         String   // Pet name
+  breed        String?  // Optional
+  species      String   // Dog, Cat, etc
+  age          Int?     // Optional
+  notes        String?  // Medical notes, preferences
+
+  clientId     String   // Parent client (foreign key)
+  userId       String   // Owner user (for quick filtering)
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
   appointments Appointment[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  client       Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 ```
-**Why:** Track individual pets. Multiple pets can belong to one client.
 
----
+**Why userId on Pet:**
+- Direct filtering by user without joining through client
+- Performance: `WHERE userId = X` is faster than JOIN
+- Data isolation: ensures user can only see their pets
 
-**Appointment Table** - Stores scheduled grooming appointments
+**Cascade delete chain:**
+- User deleted → Clients deleted → Pets deleted → Appointments deleted
+
+#### 4. Appointment Table
+**Purpose:** Schedule grooming appointments
+
 ```prisma
 model Appointment {
-  id       String   @id @default(cuid())
-  date     DateTime
-  duration Int      @default(60)  // minutes
-  service  String?
-  notes    String?
-  status   String   @default("scheduled")  // "scheduled", "completed", "cancelled"
-  petId    String
-  pet      Pet      @relation(fields: [petId], references: [id], onDelete: Cascade)
-  userId   String
-  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id        String   // Unique ID
+  petId     String   // Which pet (foreign key)
+  userId    String   // Owner user
+
+  date      DateTime // When (date + time)
+  duration  Int      @default(60)  // Minutes
+  service   String?  // Service type
+  notes     String?  // Special instructions
+  status    String   @default("scheduled")  // scheduled/completed/cancelled
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  pet       Pet      @relation(fields: [petId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 ```
-**Why:** Track when pets are coming in for grooming. Prevents double-booking.
 
----
+**Why this structure:**
+- `date`: Single DateTime field (easier queries than separate date/time)
+- `duration`: Flexible appointment lengths
+- `status`: Track lifecycle (scheduled → completed/cancelled)
+- `userId`: Direct user filtering for performance
 
-**Service Table** - Stores service offerings
+#### 5. Service Table
+**Purpose:** Store customizable service offerings
+
 ```prisma
 model Service {
-  id          String   @id @default(cuid())
-  name        String
-  duration    Int      @default(60)  // minutes
-  price       Float?
-  description String?
-  isActive    Boolean  @default(true)
-  sortOrder   Int      @default(0)
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id          String   // Unique ID
+  name        String   // "Full Groom", "Bath & Brush"
+  duration    Int      @default(60)  // Default duration
+  price       Float?   // Price in dollars
+  description String?  // What's included
+  isActive    Boolean  @default(true)  // Can hide without deleting
+  sortOrder   Int      @default(0)  // Custom ordering
+  userId      String   // Owner user
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 ```
-**Why:** Define what services are offered (Full Groom, Bath & Brush, etc.)
 
----
+**Why per-user services:**
+- Each groomer has different offerings
+- Customizable pricing
+- Can deactivate (isActive: false) instead of deleting
 
-**Settings Table** - Stores business configuration
+**Default services created on signup:**
+1. Bath & Brush - $45, 60min
+2. Full Groom - $85, 120min
+3. Haircut - $65, 90min
+4. Nail Trim - $15, 15min
+5. Ear Cleaning - $10, 10min
+6. De-shedding Treatment - $40, 45min
+
+#### 6. Settings Table
+**Purpose:** User business settings
+
 ```prisma
 model Settings {
-  id            String  @id @default(cuid())
-  businessName  String  @default("")
-  businessEmail String  @default("")
-  businessPhone String  @default("")
-  defaultDuration Int   @default(60)
-  openTime      String  @default("09:00")
-  closeTime     String  @default("17:00")
-  daysOpen      String  @default("1,2,3,4,5")  // 0=Sun, 1=Mon, etc.
-  userId        String  @unique
-  user          User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id              String   // Unique ID
+  userId          String   @unique  // One-to-one with User
+
+  businessName    String   @default("")
+  businessEmail   String   @default("")
+  businessPhone   String   @default("")
+
+  defaultDuration Int      @default(60)  // Default appointment length
+  openTime        String   @default("09:00")
+  closeTime       String   @default("17:00")
+  daysOpen        String   @default("1,2,3,4,5")  // Mon-Fri
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 ```
-**Why:** Configure business hours, contact info, default appointment length.
+
+**Why defaults:**
+- Sensible starting values (9-5, Mon-Fri)
+- User can customize later
+- Created automatically on signup
+
+#### 7. NextAuth Tables
+**Purpose:** Session management
+
+```prisma
+// OAuth accounts (Google, GitHub, etc)
+model Account {
+  id                String
+  userId            String
+  type              String  // oauth, credentials
+  provider          String  // google, github
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  // ... OAuth tokens
+}
+
+// Active sessions
+model Session {
+  id           String
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+}
+
+// Email verification tokens
+model VerificationToken {
+  identifier String  // Email or phone
+  token      String  @unique
+  expires    DateTime
+}
+```
+
+**Why these tables:**
+- NextAuth adapter requires them
+- Supports multiple auth providers
+- Handles session management
+- Email verification for passwordless login
+
+### Data Relationships
+
+```
+User (1) ─────────── (many) Client
+  │                      │
+  │                      └─────── (many) Pet
+  │                                  │
+  ├─────────────────────────────────┘
+  │                                  │
+  └──────────────── (many) Appointment
+  │
+  ├──────────────── (many) Service
+  │
+  └──────────────── (1) Settings
+
+User (1) ─────────── (many) Account (OAuth)
+User (1) ─────────── (many) Session (Active logins)
+```
+
+### Why PostgreSQL
+
+**Chosen over SQLite/MongoDB/MySQL:**
+- **ACID compliance**: Critical for payments
+- **Relational integrity**: Foreign keys prevent orphaned data
+- **Performance**: Excellent for reads with indexes
+- **Vercel integration**: Easy deploy with Supabase/Neon
+- **JSON support**: Can store structured data if needed
+- **Full-text search**: Built-in for future features
+
+### Database Provider: Supabase
+
+**Configuration in schema.prisma:**
+```prisma
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")       // Connection pool
+  directUrl = env("DIRECT_URL")          // Direct connection
+}
+```
+
+**Why two URLs:**
+- `DATABASE_URL`: For serverless (connection pooling via PgBouncer)
+- `DIRECT_URL`: For migrations (direct PostgreSQL connection)
 
 ---
 
-## Summary: The Complete Data Journey
+## Summary
 
-```
-User in Browser
-    ↓
-[1] Clicks button in UI (/src/app/*/page.tsx)
-    ↓
-[2] Calls Server Action (/src/app/actions/*.ts)
-    ↓
-[3] Server Action authenticates user (NextAuth)
-    ↓
-[4] Server Action validates input (Zod schemas)
-    ↓
-[5] Server Action queries database (Prisma)
-    ↓
-[6] Prisma translates to SQL
-    ↓
-[7] PostgreSQL database executes query
-    ↓
-[8] Database returns results
-    ↓
-[9] Prisma converts to JavaScript objects
-    ↓
-[10] Server Action returns data
-    ↓
-[11] Next.js revalidates page cache
-    ↓
-[12] UI automatically updates with new data
-    ↓
-User sees updated information!
-```
+This document showed five critical data flows:
 
-**Key Insight:** Every data operation goes through authentication and userId filtering. This ensures complete data isolation - each groomer only sees their own clients, pets, and appointments.
+1. **Initial Load**: Middleware → Auth check → Data fetch → Render
+2. **Authentication**: Form → API → Database → JWT → Cookie
+3. **Create Client**: Form → Server Action → Validation → Limit Check → DB Insert → Revalidation
+4. **Stripe Checkout**: Button → API → Stripe → Webhook → DB Update → Plan Upgrade
+5. **Database**: 7 tables storing users, clients, pets, appointments, services, settings, and auth data
+
+Every flow includes:
+- Authentication/authorization checks
+- Input validation (Zod schemas)
+- Database transactions (Prisma)
+- Error handling
+- Cache revalidation
+- User feedback (toasts/redirects)
+
+The architecture prioritizes:
+- **Security**: JWT sessions, middleware protection, server-side validation, webhook verification
+- **Performance**: Edge middleware, parallel fetches, optimistic updates
+- **Reliability**: Webhook verification, database constraints, error boundaries
+- **User Experience**: Clear error messages, real-time updates, smooth flows
+- **Monetization**: Stripe integration with client limits enforced in real-time

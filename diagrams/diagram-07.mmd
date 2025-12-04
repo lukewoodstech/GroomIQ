@@ -1,0 +1,67 @@
+sequenceDiagram
+    autonumber
+    actor User
+    participant Browser
+    participant Vercel as Vercel Edge
+    participant Middleware
+    participant Page as Server Component
+    participant Action as Server Action
+    participant Prisma
+    participant Supabase as Supabase PostgreSQL
+    participant Stripe
+    
+    rect rgb(230, 240, 255)
+        Note over User,Supabase: Initial Page Load
+        User->>Browser: Navigate to /clients
+        Browser->>Vercel: GET /clients
+        Vercel->>Middleware: Check authentication
+        Middleware->>Middleware: Validate session cookie
+        Middleware->>Page: Allowed (authenticated)
+        Page->>Prisma: getClients()
+        Prisma->>Supabase: SELECT * FROM clients WHERE userId=?
+        Supabase->>Prisma: Client records []
+        Prisma->>Page: Return clients
+        Page->>Vercel: HTML with data
+        Vercel->>Browser: Rendered page
+        Browser->>User: Display client list
+    end
+    
+    rect rgb(255, 245, 230)
+        Note over User,Stripe: User Creates Client
+        User->>Browser: Fill form + submit
+        Browser->>Action: createClient(formData)
+        Action->>Action: auth() - get user
+        Action->>Prisma: Get user + count clients
+        Prisma->>Supabase: SELECT *, COUNT(clients)
+        Supabase->>Prisma: {plan: 'free', count: 5}
+        Prisma->>Action: User data
+        Action->>Action: Check: canAddClient(5, 'free')
+        Action->>Prisma: Create client
+        Prisma->>Supabase: INSERT INTO clients
+        Supabase->>Prisma: New client
+        Prisma->>Action: Client created
+        Action->>Page: revalidatePath('/clients')
+        Page->>Browser: Refresh with new data
+        Browser->>User: Show success + updated list
+    end
+    
+    rect rgb(255, 235, 245)
+        Note over User,Stripe: User Upgrades to Pro
+        User->>Browser: Click "Upgrade to Pro"
+        Browser->>Action: POST /api/stripe/checkout
+        Action->>Prisma: Get user
+        Prisma->>Supabase: SELECT * FROM users
+        Supabase->>Action: User data
+        Action->>Stripe: Create checkout session
+        Stripe->>Action: checkout URL
+        Action->>Browser: Redirect to Stripe
+        User->>Stripe: Complete payment
+        Stripe->>Action: Webhook: subscription.created
+        Action->>Prisma: Update user plan='pro'
+        Prisma->>Supabase: UPDATE users SET plan='pro'
+        Supabase->>Prisma: Success
+        Prisma->>Action: Updated
+        Action->>Stripe: 200 OK
+        Stripe->>Browser: Redirect to /settings
+        Browser->>User: Show Pro badge
+    end

@@ -1,8 +1,8 @@
 # Architecture Pattern Analysis - GroomIQ
 
-## 1. What Architectural Pattern Am I Using?
+## 1. What Architectural Pattern Does GroomIQ Use?
 
-Your application uses a **Modern Full-Stack Monolith** architecture with characteristics of both **Client-Server** and **Serverless** patterns.
+GroomIQ uses a **Modern Full-Stack Monolith** architecture with characteristics of both **Client-Server** and **Serverless** patterns, built on Next.js 16 App Router.
 
 Let's break this down in simple terms:
 
@@ -15,15 +15,16 @@ Let's break this down in simple terms:
 - One bug can crash everything
 - Difficult to maintain as it grows
 
-**Why Your Monolith is Different (Modern):**
+**Why GroomIQ's Monolith is Different (Modern):**
 - Next.js splits code into routes and components automatically
 - Each page can load independently
 - Server Actions run separately from UI
-- Can deploy to serverless functions (Vercel automatically does this)
+- Deploys to serverless functions (Vercel automatically does this)
+- Edge middleware runs globally distributed
 
 **Visual:**
 ```
-Traditional Monolith:          Your Monolith (Next.js):
+Traditional Monolith:          GroomIQ Monolith (Next.js):
 ┌─────────────────┐           ┌──────────────────────┐
 │   One Big App   │           │   Next.js App        │
 │                 │           │  ┌────────────────┐  │
@@ -44,16 +45,18 @@ One server runs it all        └───────────────�
 **What it means:** Clear separation between what runs in the browser (client) and what runs on the server.
 
 **Client Side (Browser):**
-- React components
-- UI interactions
-- Form validation
-- Routing
+- React components (UI rendering)
+- Form interactions
+- Client-side validation
+- Navigation/routing
+- State management (React hooks)
 
 **Server Side:**
-- Authentication
-- Database queries
-- Business logic
-- Data validation
+- Authentication (NextAuth.js)
+- Database queries (Prisma)
+- Business logic (Server Actions)
+- Data validation (Zod)
+- Payment processing (Stripe)
 
 **Communication:** Server Actions (built into Next.js) - like having a direct phone line between client and server.
 
@@ -80,7 +83,7 @@ export async function createClient(data) {
 
 ### Tertiary Pattern: Serverless-Ready
 
-**What it means:** Your code is structured to run on serverless platforms (like Vercel).
+**What it means:** The code is structured to run on serverless platforms (like Vercel).
 
 **Traditional Server:**
 ```
@@ -97,17 +100,18 @@ Automatically scales up/down
 No server management
 ```
 
-**Your Code is Serverless-Ready Because:**
+**GroomIQ is Serverless-Ready Because:**
 - Each Server Action can run independently
 - Each API route is a separate function
 - Prisma manages database connections efficiently
 - No long-running background processes
+- JWT sessions (no server-side session storage)
 
 ---
 
-## 2. How is My Code Organized?
+## 2. How is the Code Organized?
 
-Your code follows **Next.js App Router Convention** with a mix of **Feature-Based** and **Layer-Based** organization.
+GroomIQ follows **Next.js App Router Convention** with a mix of **Feature-Based** and **Layer-Based** organization.
 
 ### Organization Strategy Breakdown
 
@@ -117,15 +121,30 @@ Code is separated by technical responsibility:
 ```
 /src
 ├── app/           → Presentation Layer (UI + Routing)
-├── actions/       → Business Logic Layer (Server operations)
+│   ├── page.tsx            → Home/calendar page
+│   ├── layout.tsx          → Root layout
+│   ├── clients/            → Client management pages
+│   ├── pets/               → Pet management pages
+│   ├── schedule/           → Schedule page
+│   ├── settings/           → Settings page
+│   ├── login/              → Login page
+│   ├── signup/             → Signup page
+│   ├── actions/            → Server Actions (business logic)
+│   └── api/                → API routes (auth, Stripe)
 ├── components/    → UI Component Library
+│   ├── ui/                 → Reusable primitives (button, dialog, etc)
+│   ├── sidebar.tsx         → Navigation sidebar
+│   └── conditional-layout.tsx → Layout wrapper
 ├── lib/           → Utility/Infrastructure Layer
-└── types/         → Type Definitions
+│   ├── prisma.ts           → Database client
+│   ├── stripe.ts           → Stripe client + plan config
+│   └── utils.ts            → Utility functions
+└── auth.ts        → Authentication configuration
 ```
 
 **Think of it like a burger:**
 - **Top Bun** (`/app` pages) - What users see
-- **Patty** (`/actions`) - The meat of your logic
+- **Patty** (`/app/actions`) - The meat of your logic
 - **Cheese** (`/components`) - Flavor throughout
 - **Bottom Bun** (`/lib`) - Foundation utilities
 
@@ -140,8 +159,20 @@ Within `/app`, code is organized by feature:
 │   ├── page.tsx         → List clients
 │   └── [id]/page.tsx    → View/edit single client
 ├── pets/           → Everything related to pet management
+│   ├── page.tsx         → List pets
+│   └── [id]/page.tsx    → View/edit single pet
 ├── schedule/       → Appointment scheduling
-└── settings/       → Business configuration
+│   └── page.tsx         → Calendar view
+├── settings/       → Business configuration
+│   └── page.tsx         → Settings page
+├── login/          → Authentication
+├── signup/         → Registration
+└── actions/        → Server Actions (grouped by feature)
+    ├── clients.ts       → Client CRUD operations
+    ├── pets.ts          → Pet CRUD operations
+    ├── appointments.ts  → Appointment CRUD operations
+    ├── services.ts      → Service management
+    └── settings.ts      → Settings management
 ```
 
 **Benefit:** If you need to work on "clients", all related code is in one place.
@@ -156,6 +187,7 @@ Within `/app`, code is organized by feature:
 | **Three-Tier Architecture** | Yes | Presentation (React) → Logic (Server Actions) → Data (Prisma + PostgreSQL) |
 | **Domain-Driven Design** | Partially | Features grouped by domain (Clients, Pets, Appointments) |
 | **Microservices** | No | Everything in one codebase (but could be split later) |
+| **JAMstack** | Partially | JavaScript + APIs + Markup, but with server-side rendering |
 
 ---
 
@@ -168,9 +200,9 @@ Within `/app`, code is organized by feature:
 
 **Responsibilities:**
 - User login/logout
-- Session management
-- Password hashing
-- Route protection
+- Session management (JWT)
+- Password hashing (bcrypt)
+- Route protection (middleware)
 
 **Interactions:**
 ```
@@ -198,11 +230,11 @@ Within `/app`, code is organized by feature:
 **Location:** `/src/app/clients/`, `/src/app/actions/clients.ts`
 
 **Responsibilities:**
-- Display client list
+- Display client list with pagination
 - Create new clients
 - Edit client details
-- Delete clients
-- Search/filter clients
+- Delete clients (with cascading appointment deletion)
+- **Enforce client limits based on subscription plan**
 
 **Interactions:**
 ```
@@ -213,8 +245,8 @@ Within `/app`, code is organized by feature:
 ┌─────────────────────┐
 │  createClient()     │ ─────→ Validates with Zod
 │  getClients()       │ ─────→ Checks authentication
-│  updateClient()     │ ─────→ Queries database
-│  deleteClient()     │
+│  updateClient()     │ ─────→ Checks client limit (Stripe)
+│  deleteClient()     │ ─────→ Queries database
 └─────────────────────┘
           ↓
 ┌─────────────────────┐
@@ -227,6 +259,12 @@ Within `/app`, code is organized by feature:
 └─────────────────────┘
 ```
 
+**Stripe Integration:**
+- Before creating client, checks user's plan and client count
+- Free plan: max 10 clients
+- Pro plan: unlimited clients
+- Shows upgrade prompt if limit reached
+
 ---
 
 #### Module 3: Pet Management Module
@@ -235,6 +273,7 @@ Within `/app`, code is organized by feature:
 **Similar structure to Client Management, plus:**
 - Links pets to clients (relationship)
 - Displays pet details with owner info
+- Cascading deletes (client deleted → pets deleted)
 
 ---
 
@@ -245,6 +284,7 @@ Within `/app`, code is organized by feature:
 - Conflict detection (prevents double-booking)
 - Time slot validation
 - Pet and client relationship tracking
+- Status management (scheduled, completed, cancelled)
 
 **Complex Interaction:**
 ```
@@ -268,10 +308,19 @@ Appointment linked to:
 **Location:** `/src/app/settings/`, `/src/app/actions/services.ts`
 
 **Responsibilities:**
-- Define service offerings
+- Define service offerings (per groomer)
 - Set duration and pricing
 - Enable/disable services
 - Order services for display
+- Default services created on signup
+
+**Default Services:**
+1. Bath & Brush - $45, 60min
+2. Full Groom - $85, 120min
+3. Haircut - $65, 90min
+4. Nail Trim - $15, 15min
+5. Ear Cleaning - $10, 10min
+6. De-shedding Treatment - $40, 45min
 
 ---
 
@@ -279,24 +328,58 @@ Appointment linked to:
 **Location:** `/src/app/settings/`, `/src/app/actions/settings.ts`
 
 **Responsibilities:**
-- Business information
-- Operating hours
+- Business information (name, email, phone)
+- Operating hours (open time, close time)
+- Days of operation
 - Default appointment settings
+- **Subscription management (Stripe integration)**
 
 ---
 
-#### Module 7: UI Component Library
+#### Module 7: Subscription/Payment Module
+**Location:** `/src/app/api/stripe/`, `/src/lib/stripe.ts`
+
+**Responsibilities:**
+- Stripe checkout session creation
+- Webhook processing (subscription events)
+- Billing portal access
+- Plan limit enforcement
+
+**Flow:**
+```
+User clicks "Upgrade to Pro"
+         ↓
+/api/stripe/checkout → Creates Stripe session
+         ↓
+User completes payment on Stripe
+         ↓
+Stripe webhook → /api/stripe/webhook
+         ↓
+Updates user plan in database
+         ↓
+Client limit changes: 10 → Unlimited
+```
+
+---
+
+#### Module 8: UI Component Library
 **Location:** `/src/components/ui/`
 
 **Responsibilities:**
-- Reusable UI primitives
-- Consistent styling
-- Accessibility
+- Reusable UI primitives (built on Radix UI)
+- Consistent styling (Tailwind CSS)
+- Accessibility features
 
 **Components Used Everywhere:**
-- Button, Input, Dialog
+- Button, Input, Label
+- Dialog, Dropdown, Popover
 - Form controls
-- Data tables
+- Alert dialogs
+
+**Design System:**
+- Based on shadcn/ui component library
+- Customizable via Tailwind classes
+- Accessible by default (keyboard navigation, screen readers)
 
 ---
 
@@ -317,6 +400,8 @@ Appointment linked to:
 | **Database Access** | Backend | Prisma Client in Server Actions |
 | **Data Persistence** | Database | PostgreSQL via Prisma |
 | **Session Management** | Backend | NextAuth.js (JWT tokens) |
+| **Payment Processing** | Backend | Stripe API via `/src/app/api/stripe/` |
+| **Subscription Management** | Backend | Stripe webhooks + database updates |
 
 ---
 
@@ -334,6 +419,7 @@ Appointment linked to:
 ┌──────────────────────────────────────────────────────┐
 │ BACKEND (Server Action)                              │
 │  - Authenticates user                                │
+│  - Checks client limit (Stripe plan)                 │
 │  - Validates data again (security)                   │
 │  - Checks for duplicates                             │
 │  - Calls Prisma to save                              │
@@ -358,27 +444,44 @@ Appointment linked to:
 
 ## 5. Architectural Anti-Patterns & Code Smells
 
-### What You're Doing RIGHT ✅
+### What GroomIQ is Doing RIGHT ✅
 
 1. **Separation of Concerns**
    - UI components don't directly access the database
    - Server Actions handle business logic
    - Prisma abstracts database queries
+   - Clear boundaries between layers
 
 2. **Authentication on Every Request**
    - Middleware checks auth before page loads
    - Server Actions verify userId
    - No unauthorized data access possible
+   - JWT-based sessions for performance
 
 3. **Type Safety**
    - TypeScript catches errors at compile-time
    - Zod validates data at runtime
    - Prisma provides typed database queries
+   - No "any" types scattered around
 
 4. **Data Isolation**
    - Every query filters by userId
    - Users can never see each other's data
    - Secure multi-tenancy
+   - Foreign key constraints enforced
+
+5. **Security Best Practices**
+   - Passwords hashed with bcrypt
+   - Stripe webhook signature verification
+   - SQL injection prevented (Prisma ORM)
+   - CSRF protection (NextAuth built-in)
+   - Environment variables for secrets
+
+6. **Monetization Built-In**
+   - Subscription limits enforced server-side
+   - Real-time plan checking
+   - Clear upgrade path
+   - Stripe webhooks handle plan changes
 
 ---
 
@@ -387,15 +490,15 @@ Appointment linked to:
 #### 1. **Code Duplication in Forms**
 
 **Current State:**
-Each page (Clients, Pets, Settings) has form code mixed into the page component.
+Form components are sometimes embedded directly in page files.
 
 **Better Approach:**
 Extract forms into separate components:
 ```
 /src/components/forms/
-  ├── ClientForm.tsx
-  ├── PetForm.tsx
-  └── AppointmentForm.tsx
+  ├── client-form.tsx
+  ├── pet-form.tsx
+  └── appointment-form.tsx
 ```
 
 **Why:** Easier to test, reuse, and maintain.
@@ -420,21 +523,44 @@ All Server Actions in `/src/app/actions/*.ts`
 
 **Why:** Groups all feature code together. Better for large teams.
 
+**Current approach is fine for this app size!**
+
 ---
 
-#### 3. **No Error Boundary Components**
+#### 3. **Limited Error Boundary Components**
 
 **Current State:**
-Errors bubble up and crash the page.
+Errors bubble up and can crash the page.
 
 **Better Approach:**
 Add `/app/error.tsx` and `/app/clients/error.tsx` to catch errors gracefully.
+
+**Example:**
+```typescript
+// /src/app/error.tsx
+'use client'
+
+export default function Error({
+  error,
+  reset,
+}: {
+  error: Error
+  reset: () => void
+}) {
+  return (
+    <div>
+      <h2>Something went wrong!</h2>
+      <button onClick={reset}>Try again</button>
+    </div>
+  )
+}
+```
 
 **Why:** Better user experience when things go wrong.
 
 ---
 
-#### 4. **Limited Caching Strategy**
+#### 4. **Caching Strategy Could Be More Granular**
 
 **Current State:**
 `revalidatePath()` invalidates entire sections.
@@ -442,19 +568,61 @@ Add `/app/error.tsx` and `/app/clients/error.tsx` to catch errors gracefully.
 **Better Approach:**
 Use Next.js `revalidateTag()` for granular cache control.
 
+**Example:**
+```typescript
+// Tag data
+fetch('/api/clients', { next: { tags: ['clients'] } })
+
+// Revalidate specific tag
+revalidateTag('clients')
+```
+
 **Why:** Faster page loads, less database queries.
+
+---
+
+#### 5. **No Loading States for Server Actions**
+
+**Current State:**
+Forms disable during submission but could show more feedback.
+
+**Better Approach:**
+Use React's `useFormStatus` hook for loading states.
+
+**Example:**
+```typescript
+function SubmitButton() {
+  const { pending } = useFormStatus()
+  return (
+    <button disabled={pending}>
+      {pending ? 'Creating...' : 'Create Client'}
+    </button>
+  )
+}
+```
+
+**Why:** Better user experience during async operations.
 
 ---
 
 ### No Major Anti-Patterns! 🎉
 
-Your architecture is clean and follows Next.js best practices. The suggested improvements are optimizations, not critical issues.
+GroomIQ's architecture is clean and follows Next.js best practices. The suggested improvements are optimizations, not critical issues. The codebase demonstrates:
+
+- ✅ Proper separation of concerns
+- ✅ Security-first approach
+- ✅ Type safety throughout
+- ✅ Scalable folder structure
+- ✅ Efficient data fetching
+- ✅ Modern React patterns
+- ✅ Proper authentication/authorization
+- ✅ Payment integration done right
 
 ---
 
-## Summary: Your Architecture in Plain English
+## Summary: GroomIQ's Architecture in Plain English
 
-**Imagine your app as a restaurant:**
+**Imagine the app as a restaurant:**
 
 1. **Monolith Architecture** = Everything happens in one building
    - Not a food truck (microservices)
@@ -475,11 +643,43 @@ Your architecture is clean and follows Next.js best practices. The suggested imp
    - Section 1: Client management
    - Section 2: Pet management
    - Section 3: Scheduling
+   - Section 4: Payments (Stripe)
 
 5. **Responsibilities:**
    - UI handles presentation
    - Server Actions handle processing
    - Prisma handles data storage
    - NextAuth handles security
+   - Stripe handles payments
 
-**Result:** A well-organized, maintainable application that can scale as your business grows.
+**Result:** A well-organized, maintainable application that can scale as the business grows. The architecture supports both free and paid users with proper limit enforcement, making it a viable SaaS product.
+
+### Technology Stack Summary
+
+**Frontend:**
+- React 19 (UI library)
+- Next.js 16 (framework)
+- Tailwind CSS (styling)
+- Radix UI (accessible components)
+- React Hook Form (forms)
+- Zod (validation)
+
+**Backend:**
+- Next.js Server Actions (business logic)
+- NextAuth.js (authentication)
+- Prisma (ORM)
+- Stripe (payments)
+- bcrypt.js (password hashing)
+
+**Infrastructure:**
+- PostgreSQL (database)
+- Vercel (hosting, recommended)
+- Stripe (payment processing)
+
+**Why This Stack:**
+- Fast development (Next.js all-in-one)
+- Type-safe end-to-end (TypeScript + Prisma)
+- Scalable (serverless architecture)
+- Secure (built-in best practices)
+- Cost-effective (pay only for usage)
+- Modern (latest React patterns)

@@ -1,0 +1,87 @@
+graph TB
+    subgraph "Frontend Layer"
+        Browser[Web Browser]
+        React[React 19 UI]
+        Pages[Next.js Pages<br/>Clients, Pets, Schedule]
+    end
+    
+    subgraph "Application Layer - Vercel Serverless"
+        Middleware[Middleware<br/>Auth Guard]
+        
+        subgraph "Backend Logic"
+            Auth[NextAuth.js<br/>JWT Sessions]
+            Actions[Server Actions<br/>CRUD Operations]
+            StripeAPI[Stripe Integration<br/>Checkout + Webhooks]
+        end
+    end
+    
+    subgraph "Data Layer - Supabase"
+        Prisma[Prisma ORM<br/>Type-Safe Queries]
+        
+        subgraph "PostgreSQL Database"
+            User[(User<br/>plan: free/pro<br/>stripeCustomerId)]
+            Client[(Client<br/>firstName, lastName)]
+            Pet[(Pet<br/>name, species)]
+            Appt[(Appointment<br/>date, service)]
+        end
+    end
+    
+    subgraph "External Services"
+        Stripe[Stripe API<br/>Payments]
+        Vercel[Vercel<br/>Hosting]
+    end
+    
+    %% User Flow
+    Browser --> React
+    React --> Pages
+    Pages --> Middleware
+    
+    %% Auth Flow
+    Middleware -->|✅ Authenticated| Actions
+    Middleware -->|❌ No Session| Auth
+    Auth --> Prisma
+    
+    %% Core Operations
+    Actions -->|Plan Limit Check| Prisma
+    Actions --> Prisma
+    
+    %% Payment Flow
+    Pages -->|Upgrade to Pro| StripeAPI
+    StripeAPI --> Stripe
+    Stripe -->|Webhook Events| StripeAPI
+    StripeAPI --> Prisma
+    
+    %% Database
+    Prisma --> User
+    Prisma --> Client
+    Prisma --> Pet
+    Prisma --> Appt
+    
+    %% Relationships
+    User -->|1:N| Client
+    User -->|1:N| Pet
+    Client -->|1:N| Pet
+    Pet -->|1:N| Appt
+    
+    %% Infrastructure
+    Vercel -.->|Hosts| Middleware
+    Vercel -.->|Hosts| Actions
+    
+    %% Key Features Callouts
+    Note1[Free Plan: 10 clients max<br/>Pro Plan: $10/mo unlimited]
+    Note2[Tech: Next.js 16, React 19<br/>Prisma, PostgreSQL, Stripe]
+    
+    StripeAPI -.-> Note1
+    Vercel -.-> Note2
+    
+    classDef frontend fill:#4fc3f7,stroke:#01579b,stroke-width:3px,color:#000
+    classDef backend fill:#ffb74d,stroke:#e65100,stroke-width:3px,color:#000
+    classDef database fill:#81c784,stroke:#1b5e20,stroke-width:3px,color:#000
+    classDef external fill:#f06292,stroke:#880e4f,stroke-width:3px,color:#fff
+    classDef note fill:#fff9c4,stroke:#f57f17,stroke-width:2px,color:#000
+    
+    class Browser,React,Pages frontend
+    class Middleware,Auth,Actions,StripeAPI backend
+    class Prisma,User,Client,Pet,Appt database
+    class Stripe,Vercel external
+    class Note1,Note2 note
