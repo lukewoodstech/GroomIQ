@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -109,6 +110,7 @@ export function CalendarPageContent({
   pets: Pet[];
   services: Service[];
 }) {
+  const router = useRouter();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [searchTerm, setSearchTerm] = useState("");
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -209,6 +211,7 @@ export function CalendarPageContent({
     try {
       await updateAppointment(draggedAppointment.id, formData);
       toast.success("Appointment rescheduled");
+      router.refresh();
     } catch {
       toast.error("Failed to reschedule");
     }
@@ -1170,6 +1173,8 @@ function EventDetailsDrawer({
 }
 
 function QuickStatusButton({ appointment, status }: { appointment: Appointment; status: string }) {
+  const router = useRouter();
+
   if (appointment.status === status) return null;
 
   const statusConfig = {
@@ -1187,6 +1192,7 @@ function QuickStatusButton({ appointment, status }: { appointment: Appointment; 
     try {
       await updateAppointmentStatus(appointment.id, status);
       toast.success(`Appointment marked as ${status}`);
+      router.refresh();
     } catch {
       toast.error("Failed to update status");
     }
@@ -1218,6 +1224,7 @@ function QuickAddDialog({
   hour: number;
   onClose: () => void;
 }) {
+  const router = useRouter();
   const [selectedPetId, setSelectedPetId] = useState("");
 
   const petOptions = pets.map((pet) => ({
@@ -1238,6 +1245,7 @@ function QuickAddDialog({
       await createAppointment(formData);
       onClose();
       toast.success("Appointment booked successfully");
+      router.refresh();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to book appointment";
       toast.error(message);
@@ -1336,6 +1344,7 @@ function AddAppointmentDialog({
   services: Service[];
   selectedDate: Date;
 }) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [selectedPetId, setSelectedPetId] = useState("");
 
@@ -1358,6 +1367,7 @@ function AddAppointmentDialog({
       setOpen(false);
       setSelectedPetId("");
       toast.success("Appointment booked successfully");
+      router.refresh();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to book appointment";
       toast.error(message);
@@ -1487,6 +1497,7 @@ function EditAppointmentDialog({
   pets: Pet[];
   services: Service[];
 }) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [selectedPetId, setSelectedPetId] = useState(appointment.petId);
 
@@ -1508,6 +1519,7 @@ function EditAppointmentDialog({
       await updateAppointment(appointment.id, formData);
       setOpen(false);
       toast.success("Appointment updated successfully");
+      router.refresh();
     } catch {
       toast.error("Failed to update appointment");
     }
@@ -1658,6 +1670,7 @@ function DeleteAppointmentDialog({
 }: {
   appointment: Appointment;
 }) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
 
   async function handleDelete() {
@@ -1665,6 +1678,7 @@ function DeleteAppointmentDialog({
       await deleteAppointment(appointment.id);
       setOpen(false);
       toast.success("Appointment deleted successfully");
+      router.refresh();
     } catch {
       toast.error("Failed to delete appointment");
     }
