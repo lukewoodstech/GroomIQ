@@ -55,17 +55,21 @@ type Pet = {
   id: string;
   name: string;
   client: { firstName: string; lastName: string };
+  createdAt: string;
+  updatedAt: string;
 };
 
 type Appointment = {
   id: string;
   petId: string;
-  date: Date;
+  date: string; // ISO string from server
   duration: number;
   service: string | null;
   notes: string | null;
   status: string;
   pet: Pet;
+  createdAt: string;
+  updatedAt: string;
 };
 
 type Service = {
