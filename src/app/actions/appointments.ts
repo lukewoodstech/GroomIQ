@@ -193,6 +193,11 @@ export async function getAppointments() {
     date: apt.date.toISOString(),
     createdAt: apt.createdAt.toISOString(),
     updatedAt: apt.updatedAt.toISOString(),
+    pet: {
+      ...apt.pet,
+      createdAt: apt.pet.createdAt.toISOString(),
+      updatedAt: apt.pet.updatedAt.toISOString(),
+    },
   }));
 }
 
