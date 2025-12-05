@@ -165,7 +165,7 @@ export async function getAppointments() {
     return [];
   }
 
-  return await prisma.appointment.findMany({
+  const appointments = await prisma.appointment.findMany({
     where: { userId: session.user.id },
     orderBy: {
       date: "asc",
@@ -186,6 +186,14 @@ export async function getAppointments() {
       },
     },
   });
+
+  // Serialize dates to ISO strings for Server Components
+  return appointments.map((apt) => ({
+    ...apt,
+    date: apt.date.toISOString(),
+    createdAt: apt.createdAt.toISOString(),
+    updatedAt: apt.updatedAt.toISOString(),
+  }));
 }
 
 export async function getPets() {
@@ -194,7 +202,7 @@ export async function getPets() {
     return [];
   }
 
-  return await prisma.pet.findMany({
+  const pets = await prisma.pet.findMany({
     where: { userId: session.user.id },
     orderBy: {
       name: "asc",
@@ -211,6 +219,16 @@ export async function getPets() {
       },
     },
   });
+
+  // Serialize dates to ISO strings for Server Components
+  return pets.map((pet) => ({
+    ...pet,
+    createdAt: pet.createdAt.toISOString(),
+    updatedAt: pet.updatedAt.toISOString(),
+    client: {
+      ...pet.client,
+    },
+  }));
 }
 
 export async function updateAppointment(id: string, formData: FormData) {
