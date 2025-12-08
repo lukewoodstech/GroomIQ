@@ -101,8 +101,21 @@ export async function createAppointment(formData: FormData) {
 
     const validated = appointmentSchema.parse(rawData);
 
-    // Combine date and time into a DateTime
-    const dateTime = new Date(`${validated.date}T${validated.time}`);
+    // Get timezone offset from client (in minutes)
+    const timezoneOffset = formData.get("timezoneOffset")
+      ? Number(formData.get("timezoneOffset"))
+      : 0;
+
+    // Combine date and time, accounting for client's timezone
+    // Parse components
+    const [year, month, day] = validated.date.split('-').map(Number);
+    const [hour, minute] = validated.time.split(':').map(Number);
+
+    // Create date as if in client's timezone, then convert to UTC for storage
+    // getTimezoneOffset() returns minutes WEST of UTC (positive for PST), so we ADD it to convert to UTC
+    const dateTime = new Date(Date.UTC(year, month - 1, day, hour, minute));
+    // Adjust by adding the client's timezone offset to get the correct UTC time
+    dateTime.setMinutes(dateTime.getMinutes() + timezoneOffset);
 
     // Validate date is not in the past
     if (dateTime < new Date()) {
@@ -266,8 +279,21 @@ export async function updateAppointment(id: string, formData: FormData) {
 
     const validated = updateAppointmentSchema.parse(rawData);
 
-    // Combine date and time into a DateTime
-    const dateTime = new Date(`${validated.date}T${validated.time}`);
+    // Get timezone offset from client (in minutes)
+    const timezoneOffset = formData.get("timezoneOffset")
+      ? Number(formData.get("timezoneOffset"))
+      : 0;
+
+    // Combine date and time, accounting for client's timezone
+    // Parse components
+    const [year, month, day] = validated.date.split('-').map(Number);
+    const [hour, minute] = validated.time.split(':').map(Number);
+
+    // Create date as if in client's timezone, then convert to UTC for storage
+    // getTimezoneOffset() returns minutes WEST of UTC (positive for PST), so we ADD it to convert to UTC
+    const dateTime = new Date(Date.UTC(year, month - 1, day, hour, minute));
+    // Adjust by adding the client's timezone offset to get the correct UTC time
+    dateTime.setMinutes(dateTime.getMinutes() + timezoneOffset);
 
     // Check for conflicts (excluding this appointment)
     const { hasConflict, conflictingAppointment } = await checkAppointmentConflict(

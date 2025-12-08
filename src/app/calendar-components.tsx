@@ -1277,6 +1277,7 @@ function QuickAddDialog({
           </div>
           <input type="hidden" name="date" value={format(date, "yyyy-MM-dd")} />
           <input type="hidden" name="time" value={timeString} />
+          <input type="hidden" name="timezoneOffset" value={new Date().getTimezoneOffset()} />
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="quick-duration" className="text-sm font-medium">
@@ -1469,6 +1470,7 @@ function AddAppointmentDialog({
               className="flex min-h-[72px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none disabled:cursor-not-allowed disabled:opacity-50"
             />
           </div>
+          <input type="hidden" name="timezoneOffset" value={new Date().getTimezoneOffset()} />
           <div className="flex justify-end gap-2 pt-2">
             <Button
               type="button"
@@ -1646,6 +1648,7 @@ function EditAppointmentDialog({
               className="flex min-h-[72px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none disabled:cursor-not-allowed disabled:opacity-50"
             />
           </div>
+          <input type="hidden" name="timezoneOffset" value={new Date().getTimezoneOffset()} />
           <div className="flex justify-end gap-2 pt-2">
             <Button
               type="button"
