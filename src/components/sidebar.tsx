@@ -28,7 +28,7 @@ const navigation = [
   { name: "Calendar", href: "/", icon: LayoutDashboard },
   { name: "Clients", href: "/clients", icon: Users },
   { name: "Pets", href: "/pets", icon: PawPrint },
-  { name: "Schedule", href: "/schedule", icon: Calendar },
+  { name: "List View", href: "/schedule", icon: Calendar },
   { name: "Settings", href: "/settings", icon: Settings },
 ];
 

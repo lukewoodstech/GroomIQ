@@ -93,7 +93,7 @@ type Appointment = {
 // Calendar configuration
 const CALENDAR_START_HOUR = 7;
 const CALENDAR_END_HOUR = 21;
-const HOUR_HEIGHT = 72; // Reduced for better density
+const HOUR_HEIGHT = 96; // Increased for better readability and service visibility
 
 type Service = {
   id: string;
@@ -118,8 +118,8 @@ export function CalendarPageContent({
   const [quickAddTime, setQuickAddTime] = useState<{ date: Date; hour: number } | null>(null);
   const [draggedAppointment, setDraggedAppointment] = useState<Appointment | null>(null);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
-  const [statusFilter, setStatusFilter] = useState<string | null>(null);
-  const [serviceFilter, setServiceFilter] = useState<string | null>(null);
+  const [statusFilters, setStatusFilters] = useState<Set<string>>(new Set());
+  const [serviceFilters, setServiceFilters] = useState<Set<string>>(new Set());
 
   // Update current time every minute
   useEffect(() => {
@@ -133,13 +133,34 @@ export function CalendarPageContent({
   const weekStart = startOfWeek(selectedDate, { weekStartsOn: 0 });
   const weekDates = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
+  // Toggle filter helpers
+  const toggleStatusFilter = (status: string) => {
+    const newFilters = new Set(statusFilters);
+    if (newFilters.has(status)) {
+      newFilters.delete(status);
+    } else {
+      newFilters.add(status);
+    }
+    setStatusFilters(newFilters);
+  };
+
+  const toggleServiceFilter = (service: string) => {
+    const newFilters = new Set(serviceFilters);
+    if (newFilters.has(service)) {
+      newFilters.delete(service);
+    } else {
+      newFilters.add(service);
+    }
+    setServiceFilters(newFilters);
+  };
+
   // Filter appointments for a specific date with filters
   const getAppointmentsForDate = (date: Date) => {
     return appointments.filter((apt) => {
       const aptDate = new Date(apt.date);
       const dateMatch = isSameDay(aptDate, date);
-      const statusMatch = !statusFilter || apt.status === statusFilter;
-      const serviceMatch = !serviceFilter || apt.service === serviceFilter;
+      const statusMatch = statusFilters.size === 0 || statusFilters.has(apt.status);
+      const serviceMatch = serviceFilters.size === 0 || (apt.service && serviceFilters.has(apt.service));
       return dateMatch && statusMatch && serviceMatch;
     });
   };
@@ -219,7 +240,7 @@ export function CalendarPageContent({
     setDraggedAppointment(null);
   };
 
-  const hasActiveFilters = statusFilter || serviceFilter;
+  const hasActiveFilters = statusFilters.size > 0 || serviceFilters.size > 0;
 
   return (
     <main className="flex-1 flex flex-col overflow-hidden bg-white">
@@ -285,7 +306,9 @@ export function CalendarPageContent({
                       <Filter className="h-4 w-4" />
                       Filters
                       {hasActiveFilters && (
-                        <span className="ml-1 h-2 w-2 rounded-full bg-blue-600" />
+                        <span className="ml-1 flex items-center justify-center h-5 w-5 rounded-full bg-blue-600 text-white text-xs font-medium">
+                          {statusFilters.size + serviceFilters.size}
+                        </span>
                       )}
                     </Button>
                   </DropdownMenuTrigger>
@@ -293,33 +316,36 @@ export function CalendarPageContent({
                     <div className="px-2 py-2">
                       <p className="text-xs font-semibold text-gray-700 mb-2">STATUS</p>
                       <div className="space-y-1">
-                        <button
-                          onClick={() => setStatusFilter(statusFilter === "scheduled" ? null : "scheduled")}
-                          className={`w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded ${
-                            statusFilter === "scheduled" ? "bg-blue-50 text-blue-900" : "hover:bg-gray-100"
-                          }`}
-                        >
+                        <label className="w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded hover:bg-gray-100 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={statusFilters.has("scheduled")}
+                            onChange={() => toggleStatusFilter("scheduled")}
+                            className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          />
                           <Clock className="h-4 w-4" />
-                          Scheduled
-                        </button>
-                        <button
-                          onClick={() => setStatusFilter(statusFilter === "completed" ? null : "completed")}
-                          className={`w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded ${
-                            statusFilter === "completed" ? "bg-green-50 text-green-900" : "hover:bg-gray-100"
-                          }`}
-                        >
+                          <span>Scheduled</span>
+                        </label>
+                        <label className="w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded hover:bg-gray-100 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={statusFilters.has("completed")}
+                            onChange={() => toggleStatusFilter("completed")}
+                            className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                          />
                           <CheckCircle className="h-4 w-4" />
-                          Completed
-                        </button>
-                        <button
-                          onClick={() => setStatusFilter(statusFilter === "cancelled" ? null : "cancelled")}
-                          className={`w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded ${
-                            statusFilter === "cancelled" ? "bg-red-50 text-red-900" : "hover:bg-gray-100"
-                          }`}
-                        >
+                          <span>Completed</span>
+                        </label>
+                        <label className="w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded hover:bg-gray-100 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={statusFilters.has("cancelled")}
+                            onChange={() => toggleStatusFilter("cancelled")}
+                            className="h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-500"
+                          />
                           <XCircle className="h-4 w-4" />
-                          Cancelled
-                        </button>
+                          <span>Cancelled</span>
+                        </label>
                       </div>
                     </div>
                     {services.length > 0 && (
@@ -329,16 +355,19 @@ export function CalendarPageContent({
                           <p className="text-xs font-semibold text-gray-700 mb-2">SERVICES</p>
                           <div className="space-y-1 max-h-48 overflow-y-auto">
                             {services.map((service) => (
-                              <button
+                              <label
                                 key={service.id}
-                                onClick={() => setServiceFilter(serviceFilter === service.name ? null : service.name)}
-                                className={`w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded ${
-                                  serviceFilter === service.name ? "bg-gray-900 text-white" : "hover:bg-gray-100"
-                                }`}
+                                className="w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded hover:bg-gray-100 cursor-pointer"
                               >
+                                <input
+                                  type="checkbox"
+                                  checked={serviceFilters.has(service.name)}
+                                  onChange={() => toggleServiceFilter(service.name)}
+                                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                />
                                 <Scissors className="h-4 w-4" />
-                                {service.name}
-                              </button>
+                                <span>{service.name}</span>
+                              </label>
                             ))}
                           </div>
                         </div>
@@ -349,8 +378,8 @@ export function CalendarPageContent({
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
                           onClick={() => {
-                            setStatusFilter(null);
-                            setServiceFilter(null);
+                            setStatusFilters(new Set());
+                            setServiceFilters(new Set());
                           }}
                           className="text-sm text-red-600 cursor-pointer"
                         >
@@ -937,8 +966,8 @@ function AppointmentBlock({
             <span>{format(endDate, "h:mm a")}</span>
           </div>
 
-          {appointment.service && height > 80 && (
-            <div className="mt-2 flex items-center gap-1 text-xs font-medium text-gray-700">
+          {appointment.service && height > 60 && (
+            <div className="mt-1 flex items-center gap-1 text-xs font-medium text-gray-700">
               <Scissors className="h-3 w-3" />
               <span className="truncate">{appointment.service}</span>
             </div>
@@ -998,7 +1027,12 @@ function WeekAppointmentBlock({
       }}
     >
       <div className="font-semibold truncate leading-tight">{appointment.pet.name}</div>
-      <div className="opacity-90 truncate leading-tight text-xs">
+      {appointment.service && height > 50 && (
+        <div className="opacity-90 truncate leading-tight text-xs font-medium">
+          {appointment.service}
+        </div>
+      )}
+      <div className="opacity-75 truncate leading-tight text-xs">
         {format(aptDate, "h:mm a")}
       </div>
     </div>
