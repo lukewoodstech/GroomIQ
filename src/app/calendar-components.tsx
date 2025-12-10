@@ -1004,11 +1004,29 @@ function WeekAppointmentBlock({
     (startMinute / 60) * HOUR_HEIGHT;
   const height = durationHours * HOUR_HEIGHT;
 
-  // Status-based styling
+  // Calculate end time
+  const endDate = new Date(aptDate.getTime() + appointment.duration * 60000);
+
+  // Status-based styling matching daily view
   const statusStyles = {
-    scheduled: "bg-blue-500 text-white",
-    completed: "bg-green-500 text-white",
-    cancelled: "bg-red-500 text-white",
+    scheduled: {
+      bg: "bg-blue-50",
+      border: "border-l-blue-500",
+      text: "text-blue-900",
+      badge: "bg-blue-100 text-blue-700",
+    },
+    completed: {
+      bg: "bg-green-50",
+      border: "border-l-green-500",
+      text: "text-green-900",
+      badge: "bg-green-100 text-green-700",
+    },
+    cancelled: {
+      bg: "bg-red-50",
+      border: "border-l-red-500",
+      text: "text-red-900",
+      badge: "bg-red-100 text-red-700",
+    },
   };
 
   const style = statusStyles[appointment.status as keyof typeof statusStyles] || statusStyles.scheduled;
@@ -1018,22 +1036,59 @@ function WeekAppointmentBlock({
       draggable
       onDragStart={() => onDragStart(appointment)}
       onClick={() => onClick(appointment)}
-      className={`absolute ${style} rounded-md px-2 py-1.5 text-xs font-medium cursor-pointer hover:shadow-lg hover:z-20 transition-all z-10 overflow-hidden`}
+      className={`absolute ${style.bg} ${style.border} border-l-4 border-r border-t border-b border-gray-200 rounded-lg p-2 shadow-sm cursor-pointer hover:shadow-lg transition-all z-10 group overflow-hidden`}
       style={{
         top: `${top}px`,
-        height: `${Math.max(height, 40)}px`,
+        height: `${Math.max(height, 64)}px`,
         left: `calc(5rem + ${dayIndex} * (100% - 5rem) / ${totalDays} + 2px)`,
         width: `calc((100% - 5rem) / ${totalDays} - 4px)`,
       }}
     >
-      <div className="font-semibold truncate leading-tight">{appointment.pet.name}</div>
-      {appointment.service && height > 50 && (
-        <div className="opacity-90 truncate leading-tight text-xs font-medium">
-          {appointment.service}
+      <div className="flex flex-col gap-1 h-full">
+        {/* Header: Avatar + Pet Name + Status Badge */}
+        <div className="flex items-start gap-1.5">
+          {/* Pet Avatar - smaller for narrow columns */}
+          <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-semibold text-[10px] flex-shrink-0">
+            {appointment.pet.name.substring(0, 2).toUpperCase()}
+          </div>
+
+          {/* Pet Name + Client Name */}
+          <div className="flex-1 min-w-0">
+            <h3 className={`font-semibold text-xs ${style.text} truncate leading-tight`}>
+              {appointment.pet.name}
+            </h3>
+            {height > 50 && (
+              <p className="text-[10px] text-gray-600 truncate leading-tight">
+                {appointment.pet.client.firstName} {appointment.pet.client.lastName[0]}.
+              </p>
+            )}
+          </div>
+
+          {/* Status Badge - only show for taller blocks */}
+          {height > 70 && (
+            <StatusBadge status={appointment.status} size="sm" />
+          )}
         </div>
-      )}
-      <div className="opacity-75 truncate leading-tight text-xs">
-        {format(aptDate, "h:mm a")}
+
+        {/* Time Range */}
+        <div className="flex items-center gap-0.5 text-[10px] text-gray-600">
+          <Clock className="h-2.5 w-2.5 flex-shrink-0" />
+          <span className="truncate">{format(aptDate, "h:mm a")}</span>
+          {height > 60 && (
+            <>
+              <span className="text-gray-400">-</span>
+              <span className="truncate">{format(endDate, "h:mm a")}</span>
+            </>
+          )}
+        </div>
+
+        {/* Service - show for medium height blocks */}
+        {appointment.service && height > 80 && (
+          <div className="flex items-center gap-0.5 text-[10px] font-medium text-gray-700">
+            <Scissors className="h-2.5 w-2.5 flex-shrink-0" />
+            <span className="truncate">{appointment.service}</span>
+          </div>
+        )}
       </div>
     </div>
   );
